@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from src.core.config import get_settings
 from src.db.models import Job, JobStatus, JobType, Lead, LeadStatus, async_session
@@ -125,9 +125,12 @@ class JobRunner:
                 select(Job)
                 .where(
                     Job.job_type == JobType.DAILY_OUTREACH,
-                    Job.created_at >= today_start,
+                    or_(
+                        Job.started_at >= today_start,
+                        Job.completed_at >= today_start,
+                    ),
                 )
-                .order_by(Job.created_at.desc())
+                .order_by(Job.started_at.desc().nulls_last(), Job.completed_at.desc().nulls_last())
                 .limit(1)
             )
             job = result.scalar_one_or_none()
