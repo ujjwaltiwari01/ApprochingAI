@@ -84,9 +84,11 @@ class LLMClient:
     ) -> tuple[str, str]:
         """Returns (response_text, provider_name). Tries providers in configured order."""
         assert LLMClient._semaphore is not None
+        errors: list[str] = []
         async with LLMClient._semaphore:
             for provider in self.providers:
                 if self._is_provider_cooling(provider):
+                    errors.append(f"{provider}: cooling down")
                     continue
                 try:
                     await self._throttle(provider)
@@ -99,15 +101,19 @@ class LLMClient:
                         await self._post_call_delay()
                         return result, provider
                 except asyncio.TimeoutError:
+                    errors.append(f"{provider}: timed out after {self.timeout}s")
                     logger.warning(f"{provider} timed out after {self.timeout}s ({task})")
                 except Exception as exc:
                     if self._is_rate_limited(exc):
                         cooldown = self._parse_cooldown(exc, provider)
                         self._cooldown_provider(provider, cooldown)
+                        errors.append(f"{provider}: rate limited")
                         logger.warning(f"{provider} rate limited ({task}), cooldown {cooldown:.0f}s")
                     else:
+                        errors.append(f"{provider}: {exc}")
                         logger.warning(f"{provider} failed ({task}): {exc}")
-            raise RuntimeError("All LLM providers failed")
+            detail = "; ".join(errors) if errors else "no providers configured"
+            raise RuntimeError(f"All LLM providers failed ({detail})")
 
     def _is_provider_cooling(self, provider: str) -> bool:
         return self._provider_cooldown_until.get(provider, 0) > time.monotonic()

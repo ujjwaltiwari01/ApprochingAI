@@ -23,6 +23,26 @@ include_followup = st.checkbox("Include follow-up #1 preview", value=False)
 if st.button("Generate previews", type="primary"):
     with st.spinner("Generating emails via LLM (may take 30–60 seconds)..."):
         try:
+            from src.core.config import get_settings
+
+            get_settings.cache_clear()
+            s = get_settings()
+            missing = [
+                name
+                for name, val in (
+                    ("MISTRAL_API_KEY", s.mistral_api_key),
+                    ("MISTRAL_API_KEY_2", s.mistral_api_key_2),
+                    ("CEREBRAS_API_KEY", s.cerebras_api_key),
+                )
+                if not (val and val.strip())
+            ]
+            if missing:
+                st.warning(
+                    "Missing on this service: "
+                    + ", ".join(missing)
+                    + ". Add them under outreach-dashboard → Environment on Render."
+                )
+
             from scripts.preview_emails import generate_previews
 
             out_path = __import__("asyncio").run(
