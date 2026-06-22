@@ -17,18 +17,47 @@ jobs:
             exit 1
           fi
 
+      - name: Wake API (Render cold start)
+        env:
+          RENDER_URL: ${{ secrets.RENDER_URL }}
+        run: |
+          set -e
+          base="${RENDER_URL%/}"
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /tmp/health.json -w "%{http_code}" "${base}/health")
+            echo "Health attempt $i: HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "API did not respond on ${base}/health"
+          exit 1
+
       - name: Run outreach chunks until complete
         env:
           RENDER_URL: ${{ secrets.RENDER_URL }}
           JOB_SECRET: ${{ secrets.JOB_SECRET }}
         run: |
           set -e
+          base="${RENDER_URL%/}"
           for i in $(seq 1 36); do
             echo "=== Chunk $i/36 ==="
-            body=$(curl -sf -X POST "${RENDER_URL}/jobs/daily-outreach" \
+            http_code=$(curl -s -o /tmp/chunk.json -w "%{http_code}" -X POST "${base}/jobs/daily-outreach" \
               -H "Authorization: Bearer ${JOB_SECRET}" \
               -H "Content-Type: application/json")
+            body=$(cat /tmp/chunk.json)
+            echo "HTTP ${http_code}"
             echo "$body"
+            if [ "$http_code" = "401" ]; then
+              echo "JOB_SECRET mismatch: copy JOB_SECRET from Render outreach-api Environment into GitHub secrets."
+              exit 1
+            fi
+            if [ "$http_code" != "200" ]; then
+              echo "Request failed (HTTP ${http_code}). Check Render outreach-api logs."
+              exit 1
+            fi
             completed=$(echo "$body" | python3 -c "import sys,json; print(json.load(sys.stdin).get('completed', False))")
             if [ "$completed" = "True" ]; then
               echo "Daily outreach complete."
