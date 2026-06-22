@@ -50,6 +50,8 @@ def test_connection() -> dict:
 def get_dashboard_metrics() -> dict:
     total = _count("leads")
     sent = _count("leads", "sent_at=not.is.null")
+    generated = _count("leads", "status=eq.EMAIL_GENERATED")
+    email_sent_status = _count("leads", "status=eq.EMAIL_SENT")
     opened = _count("leads", "opened_at=not.is.null")
     clicked = _count("leads", "clicked_at=not.is.null")
     replied = _count("leads", "replied_at=not.is.null")
@@ -58,6 +60,8 @@ def get_dashboard_metrics() -> dict:
     return {
         "total": total,
         "sent": sent,
+        "generated": generated,
+        "email_sent_status": email_sent_status,
         "opened": opened,
         "clicked": clicked,
         "replied": replied,

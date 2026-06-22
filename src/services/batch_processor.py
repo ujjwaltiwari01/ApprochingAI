@@ -145,7 +145,10 @@ class BatchProcessor:
         try:
             async with async_session() as session:
                 result = await session.execute(select(Lead).where(Lead.id == lead.id))
-                db_lead = result.scalar_one()
+                db_lead = result.scalar_one_or_none()
+                if not db_lead:
+                    logger.error(f"Lead {lead.id} not found after send to {lead.email}")
+                    return
                 if not is_followup:
                     db_lead.status = LeadStatus.EMAIL_SENT
                     db_lead.sent_at = datetime.now(timezone.utc)
@@ -154,6 +157,5 @@ class BatchProcessor:
                 await session.commit()
         except Exception as exc:
             logger.error(
-                f"Email sent to {lead.email} but DB update failed for lead {lead.id}: {exc}"
+                f"Email delivered to {lead.email} but DB update failed for lead {lead.id}: {exc}"
             )
-            raise

@@ -22,19 +22,26 @@ except Exception as exc:
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Leads", f"{m['total']:,}")
 col2.metric("Emails Sent", f"{m['sent']:,}")
-col3.metric("Replies", f"{m['replied']:,}")
-col4.metric("Interviews", m["interviews"])
+col3.metric("Generated (in DB)", f"{m.get('generated', 0):,}")
+col4.metric("Replies", f"{m['replied']:,}")
 
 col5, col6, col7, col8 = st.columns(4)
+col5.metric("Interviews", m["interviews"])
 open_rate = (m["opened"] / m["sent"] * 100) if m["sent"] else 0
 click_rate = (m["clicked"] / m["sent"] * 100) if m["sent"] else 0
 reply_rate = (m["replied"] / m["sent"] * 100) if m["sent"] else 0
 
-col5.metric("Open Rate", f"{open_rate:.1f}%")
-col6.metric("Click Rate", f"{click_rate:.1f}%")
-col7.metric("Reply Rate", f"{reply_rate:.1f}%")
-col8.metric("Hires", m["hired"])
+col6.metric("Open Rate", f"{open_rate:.1f}%")
+col7.metric("Click Rate", f"{click_rate:.1f}%")
+col8.metric("Reply Rate", f"{reply_rate:.1f}%")
 
 st.divider()
 st.subheader("Pipeline Overview")
-st.bar_chart({"NEW": m["total"], "SENT": m["sent"], "REPLIED": m["replied"]})
+st.bar_chart(
+    {
+        "TOTAL": m["total"],
+        "GENERATED": m.get("generated", 0),
+        "SENT": m["sent"],
+        "REPLIED": m["replied"],
+    }
+)
