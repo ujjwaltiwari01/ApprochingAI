@@ -142,12 +142,18 @@ class BatchProcessor:
         )
         stats["sent"] += 1
 
-        async with async_session() as session:
-            result = await session.execute(select(Lead).where(Lead.id == lead.id))
-            db_lead = result.scalar_one()
-            if not is_followup:
-                db_lead.status = LeadStatus.EMAIL_SENT
-                db_lead.sent_at = datetime.now(timezone.utc)
-            db_lead.message_id = message_id
-            db_lead.brevo_account = account_id
-            await session.commit()
+        try:
+            async with async_session() as session:
+                result = await session.execute(select(Lead).where(Lead.id == lead.id))
+                db_lead = result.scalar_one()
+                if not is_followup:
+                    db_lead.status = LeadStatus.EMAIL_SENT
+                    db_lead.sent_at = datetime.now(timezone.utc)
+                db_lead.message_id = message_id
+                db_lead.brevo_account = account_id
+                await session.commit()
+        except Exception as exc:
+            logger.error(
+                f"Email sent to {lead.email} but DB update failed for lead {lead.id}: {exc}"
+            )
+            raise

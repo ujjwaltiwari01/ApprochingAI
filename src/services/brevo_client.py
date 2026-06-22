@@ -35,7 +35,10 @@ class BrevoClient:
         message_id = await self._send_with_account(
             account, to_email, to_name, subject, html_body, lead_id, followup_number
         )
-        await self._increment_counter(account["id"], is_followup)
+        try:
+            await self._increment_counter(account["id"], is_followup)
+        except Exception as exc:
+            logger.warning(f"Send counter update failed for account {account['id']}: {exc}")
         return message_id, account["id"]
 
     @async_retry(max_attempts=5, base_delay=2.0)
