@@ -70,6 +70,24 @@ def get_dashboard_metrics() -> dict:
     }
 
 
+LEAD_STATUSES = [
+    "NEW",
+    "WEBSITE_ANALYZED",
+    "EMAIL_GENERATED",
+    "EMAIL_SENT",
+    "OPENED",
+    "CLICKED",
+    "REPLIED",
+    "INTERESTED",
+    "INTERVIEW",
+    "HIRED",
+    "BOUNCED",
+    "SPAM",
+    "FAILED",
+    "PAUSED",
+]
+
+
 def fetch_leads(status: str | None = None, score_min: int = 0, limit: int = 100) -> list[dict]:
     params = [
         f"match_score=gte.{score_min}",

@@ -8,15 +8,14 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.db.models import LeadStatus
-from streamlit_app.db_utils import fetch_leads
+from streamlit_app.db_utils import LEAD_STATUSES, fetch_leads
 
 st.set_page_config(page_title="Leads", layout="wide")
 st.title("Leads")
 
 status_filter = st.selectbox(
     "Filter by status",
-    ["All"] + [s.value for s in LeadStatus],
+    ["All"] + LEAD_STATUSES,
 )
 score_min = st.slider("Minimum match score", 0, 100, 0)
 limit = st.number_input("Max results", 10, 1000, 100)

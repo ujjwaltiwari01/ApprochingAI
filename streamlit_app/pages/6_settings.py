@@ -49,18 +49,32 @@ if not render_url:
 job_secret = os.getenv("JOB_SECRET", "")
 
 if render_url and job_secret:
-    if st.button("Trigger Daily Outreach"):
+    st.caption(
+        "Runs **one chunk** (~15 leads). On Render free tier this often takes **3–8 minutes**. "
+        "Use GitHub Actions for the full daily run."
+    )
+    if st.button("Trigger one outreach chunk"):
         import httpx
 
-        try:
-            response = httpx.post(
-                f"{render_url}/jobs/daily-outreach",
-                headers={"Authorization": f"Bearer {job_secret}"},
-                timeout=10,
-            )
-            st.json(response.json())
-        except Exception as exc:
-            st.error(f"Failed: {exc}")
+        base = render_url.rstrip("/")
+        with st.spinner("Waking API and processing chunk — please wait (up to 8 min)..."):
+            try:
+                httpx.get(f"{base}/health", timeout=120)
+                response = httpx.post(
+                    f"{base}/jobs/daily-outreach",
+                    headers={"Authorization": f"Bearer {job_secret}"},
+                    timeout=600,
+                )
+                response.raise_for_status()
+                st.success("Chunk finished")
+                st.json(response.json())
+            except httpx.TimeoutException:
+                st.error(
+                    "Timed out after 10 minutes. The job may still be running on Render — "
+                    "check outreach-api → Logs, or use GitHub Actions."
+                )
+            except Exception as exc:
+                st.error(f"Failed: {exc}")
 else:
     st.info("Set RENDER_PUBLIC_URL and JOB_SECRET to trigger jobs from here.")
 
