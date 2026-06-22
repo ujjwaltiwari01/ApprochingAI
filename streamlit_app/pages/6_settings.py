@@ -41,7 +41,11 @@ st.markdown("""
 """)
 
 st.subheader("Manual Job Trigger")
-render_url = os.getenv("RENDER_PUBLIC_URL", "")
+render_url = os.getenv("RENDER_PUBLIC_URL", "").strip().rstrip("/")
+if render_url and not render_url.startswith(("http://", "https://")):
+    render_url = f"https://{render_url}"
+if not render_url:
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
 job_secret = os.getenv("JOB_SECRET", "")
 
 if render_url and job_secret:

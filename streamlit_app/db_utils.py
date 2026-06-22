@@ -10,7 +10,10 @@ load_dotenv()
 
 
 def _url() -> str:
-    return os.getenv("SUPABASE_URL", "").rstrip("/")
+    url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    if url and not url.startswith(("http://", "https://")):
+        url = f"https://{url}"
+    return url
 
 
 def _key() -> str:

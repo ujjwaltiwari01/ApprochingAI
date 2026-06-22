@@ -35,6 +35,15 @@ def verify_job_secret(authorization: str = Header(default="")) -> None:
 
 
 def _register_routes(app: FastAPI) -> None:
+    @app.get("/")
+    async def root():
+        return {
+            "service": "Job Outreach API",
+            "health": "/health",
+            "docs": "/docs",
+            "dashboard_note": "Use the outreach-dashboard service URL for the Streamlit UI.",
+        }
+
     @app.post("/jobs/daily-outreach")
     async def trigger_daily_outreach(_: None = Depends(verify_job_secret)):
         """Process one outreach chunk synchronously (Render free-tier safe)."""
