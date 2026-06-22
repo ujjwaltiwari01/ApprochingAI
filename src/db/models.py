@@ -66,6 +66,9 @@ class ScrapeStatus(str, enum.Enum):
     CACHED = "cached"
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    return [member.value for member in enum_cls]
+
 class Lead(Base):
     __tablename__ = "leads"
 
@@ -75,7 +78,10 @@ class Lead(Base):
     company_name: Mapped[str | None] = mapped_column(Text)
     website: Mapped[str | None] = mapped_column(Text)
     country: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[LeadStatus] = mapped_column(Enum(LeadStatus), default=LeadStatus.NEW)
+    status: Mapped[LeadStatus] = mapped_column(
+        Enum(LeadStatus, name="lead_status", create_type=False, values_callable=_enum_values),
+        default=LeadStatus.NEW,
+    )
     current_stage: Mapped[str | None] = mapped_column(Text, default="initial")
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -113,7 +119,10 @@ class WebsiteCache(Base):
     industry: Mapped[str | None] = mapped_column(Text)
     specialization: Mapped[str | None] = mapped_column(Text)
     last_scraped: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    scrape_status: Mapped[ScrapeStatus] = mapped_column(Enum(ScrapeStatus), default=ScrapeStatus.PENDING)
+    scrape_status: Mapped[ScrapeStatus] = mapped_column(
+        Enum(ScrapeStatus, name="scrape_status", create_type=False, values_callable=_enum_values),
+        default=ScrapeStatus.PENDING,
+    )
     error_log: Mapped[str | None] = mapped_column(Text)
     analysis_json: Mapped[dict | None] = mapped_column(JSONB)
 
@@ -152,8 +161,14 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    job_type: Mapped[JobType] = mapped_column(Enum(JobType), nullable=False)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.PENDING)
+    job_type: Mapped[JobType] = mapped_column(
+        Enum(JobType, name="job_type", create_type=False, values_callable=_enum_values),
+        nullable=False,
+    )
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus, name="job_status", create_type=False, values_callable=_enum_values),
+        default=JobStatus.PENDING,
+    )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_log: Mapped[list | None] = mapped_column(JSONB, default=list)
