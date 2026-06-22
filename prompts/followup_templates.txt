@@ -1,0 +1,23 @@
+Write a follow-up email for {company_name}.
+
+Follow-up number: {followup_number}
+Previous subject: {previous_subject}
+Engagement: {engagement_type}
+
+Rules:
+- Under 120 words
+- Reference the previous email briefly
+- Add new value or a different angle
+- Include portfolio: {portfolio_url}
+- Include LinkedIn: {linkedin_url}
+{resume_line}
+- Never sound desperate or pushy
+- If engagement was "never_opened", use a completely new subject line
+
+Agency analysis:
+{agency_analysis}
+
+Output format:
+Subject: [subject line]
+Email:
+[email body]

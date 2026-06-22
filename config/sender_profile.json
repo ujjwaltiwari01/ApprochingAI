@@ -1,0 +1,40 @@
+{
+  "name": "Ujjwal Tiwari",
+  "title": "AI Engineer",
+  "location": "Varanasi, India",
+  "email": "ujjwal.it2023-24@recabn.ac.in",
+  "phone": "+91-93362-69095",
+  "portfolio_url": "https://ujjwaltiwari01.netlify.app/",
+  "linkedin_url": "https://linkedin.com/in/ujjwal-tiwari-b34044341",
+  "github_url": "https://github.com/ujjwaltiwari01",
+  "summary": "AI engineer with hands-on experience building and deploying LLM systems, RAG pipelines, and workflow automation in production environments. Interned at a large real estate conglomerate architecting finance automation that replaced multi-day manual processes. Independently founded and operated a B2B AI consultancy serving 20+ international clients.",
+  "skills": [
+    "Generative AI", "LangChain", "OpenAI API", "Claude API", "RAG", "LLM Agents",
+    "Multi-Agent Systems", "Prompt Engineering", "Python", "FastAPI", "Supabase",
+    "Streamlit", "n8n", "Workflow Automation", "Web Scraping"
+  ],
+  "experience_highlights": [
+    "Designed document intelligence pipelines achieving ~98% field-level accuracy at Embassy Group",
+    "Founded AI Agent Bros — delivered 27+ automation solutions for 20+ international clients",
+    "Built Converzia outreach platform scaling to 1,000+ leads/day with 50-70% open rates",
+    "Engineered HireFlow AI reducing recruiter screening effort by 70-85%"
+  ],
+  "projects": [
+    {
+      "name": "Converzia",
+      "url": "https://converzia.netlify.app/",
+      "description": "LLM pipeline analyzing company websites to generate personalized outbound emails at scale"
+    },
+    {
+      "name": "HireFlow AI",
+      "description": "Multi-signal candidate evaluation combining ATS scoring, LLM analysis, and portfolio validation"
+    }
+  ],
+  "seeking": [
+    "AI Engineer roles",
+    "AI Consultant roles",
+    "AI Internships",
+    "Contract opportunities",
+    "Agency partnerships"
+  ]
+}

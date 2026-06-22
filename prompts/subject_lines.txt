@@ -1,0 +1,68 @@
+============================================================
+TASK
+============================================================
+Generate 5 subject lines for a cold outreach email to {company_name}.
+The sender is Ujjwal Tiwari, an AI engineer seeking a role or contract engagement.
+
+Agency context: {agency_analysis}
+
+============================================================
+SUBJECT LINE RULES
+============================================================
+Each subject line must be 5 words or fewer.
+Use sentence case only. No title case.
+No punctuation at the end.
+No emojis.
+No spam trigger words: free, guarantee, limited time, act now, opportunity, exciting, urgent.
+
+WHAT WORKS (pick the best fit per line):
+Pattern A: Name a specific thing they do or build
+  Example: "Automating your client onboarding"
+Pattern B: A question that implies you understand their world
+  Example: "How are you handling LLM QA"
+Pattern C: A plain statement of what you bring
+  Example: "AI engineer open to contract work"
+Pattern D: Reference a shared context or tool
+  Example: "Re: your Python AI stack"
+Pattern E: Intrigue without clickbait
+  Example: "Something I noticed on your site"
+
+DO NOT use all 5 patterns. Pick the 5 strongest for this specific agency.
+Vary the patterns across the 5 lines.
+At least 2 lines must feel like they were written specifically for {company_name}, not any agency.
+
+The selected subject line must be the one most specific 
+to this agency. Generic lines like "ai engineer open to 
+contract" should only be selected if no better option exists.
+Rank specificity above all other criteria when selecting.
+
+============================================================
+OUTPUT FORMAT
+============================================================
+Output exactly 5 lines, numbered, nothing else.
+No explanation. No headers. No extra text.
+
+1. [subject line]
+2. [subject line]
+3. [subject line]
+4. [subject line]
+5. [subject line]
+
+
+============================================================
+OUTPUT FORMAT — critical
+============================================================
+Output exactly 5 lines. Each line starts with a number, 
+a period, and a space. Nothing else on the line.
+The subject line text only. No arrows. No labels. 
+No "← selected". No explanation.
+All lowercase. No punctuation at the end.
+
+Example of correct output:
+1. ai engineer open to contract
+2. how are you handling llm ops
+3. re your mobile app clients
+4. something i noticed on your site
+5. automating your client onboarding
+============================================================
+

@@ -1,0 +1,126 @@
+\documentclass[a4paper,10pt]{article}
+ 
+\usepackage[top=0.22in, bottom=0.18in, left=0.38in, right=0.38in]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{xcolor}
+ 
+\definecolor{accent}{HTML}{1565C0}
+\pagestyle{empty}
+\hypersetup{colorlinks=true, urlcolor=accent, hidelinks}
+ 
+\titlespacing*{\section}{0pt}{3.5pt}{2.5pt}
+\titleformat{\section}{\normalsize\bfseries\color{accent}}{}{0em}{}[\vspace{-1pt}\color{accent}\hrule\vspace{1pt}]
+ 
+\setlist[itemize]{noitemsep, topsep=1pt, partopsep=0pt, leftmargin=0.14in, parsep=0pt}
+ 
+\linespread{0.93}
+\setlength{\parskip}{0pt}
+ 
+\newcommand{\entry}[2]{\textbf{#1} \hfill \small{#2}}
+ 
+\begin{document}
+ 
+%--- HEADER ---%
+\begin{center}
+{\Large\textbf{Ujjwal Tiwari}}\\[1.5pt]
+{\small
+Varanasi, India\enspace|\enspace
+\href{mailto:ujjwal.it2023-24@recabn.ac.in}{ujjwal.it2023-24@recabn.ac.in}\enspace|\enspace
++91-93362-69095\enspace|\enspace
+\href{https://linkedin.com/in/ujjwal-tiwari-b34044341}{LinkedIn}\enspace|\enspace
+\href{https://github.com/ujjwaltiwari01}{GitHub}\enspace|\enspace
+\href{https://ujjwaltiwari01.netlify.app/}{Portfolio}
+}
+\end{center}
+\vspace{-4pt}
+ 
+%--- SUMMARY ---%
+\section*{Summary}
+{\small
+AI engineer with hands-on experience building and deploying LLM systems, RAG pipelines, and workflow automation in production environments. Interned at a large real estate conglomerate architecting finance automation that replaced multi-day manual processes. Independently founded and operated a B2B AI consultancy serving 20+ international clients. Comfortable owning ambiguous problems end-to-end — from architecture through deployment and stakeholder delivery.
+}
+ 
+%--- SKILLS ---%
+\section*{Skills}
+{\small
+\textbf{AI \& LLM:} Generative AI, LangChain, OpenAI API, Claude API, RAG, LLM Agents, Multi-Agent Systems, Prompt Engineering, Embeddings, Vector Search, Semantic Retrieval, FAISS, Qdrant, NLP, Prompt Pipelines, AI Orchestration, LLMOps\\[1pt]
+\textbf{Backend \& APIs:} Python, FastAPI, Node.js, Express, REST APIs, SQL, PostgreSQL, MongoDB, Supabase, Firebase, API Integration\\[1pt]
+\textbf{Automation \& Orchestration:} n8n, Make.com, AI Workflow Automation, Workflow Pipelines, Agentic Workflows, Vapi, Web Scraping\\[1pt]
+\textbf{Frontend \& Interfaces:} React, Next.js, Streamlit, Figma\enspace\textbf{|}\enspace\textbf{Infra \& Tooling:} Docker, Railway , AWS, CI/CD, Model Deployment, Inference Pipelines, Git, Postman, Cursor
+}
+ 
+%--- EXPERIENCE ---%
+\section*{Experience}
+ 
+\noindent\entry{AI Engineer Intern — Embassy Group}{Mar 2026 -- Present}\\[2pt]
+{\small
+\begin{itemize}
+  \item Designed and deployed document intelligence pipelines for invoice extraction, petty cash classification, and rent reconciliation — achieving \textasciitilde98\% field-level accuracy and replacing workflows that previously consumed 7--8 person-days per month.
+  \item Built automated DSR generation and multi-source MIS reporting, eliminating \textasciitilde15 days of manual effort monthly; combined finance automation contributes an estimated \textbf{\textasciitilde{}₹8.9L in annual operational savings}.
+  \item Delivered executive analytics dashboards consumed weekly by CFO, CEO, and COO for operational review — owned the full pipeline from data ingestion through Streamlit deployment on Railway.
+  \item Integrated LLM-based classification and FAISS retrieval into reconciliation workflows, reducing settlement cycle time by 3--4 days per month across finance teams.
+\end{itemize}
+}
+ 
+\vspace{2pt}
+\noindent\entry{Founder \& AI Engineer — \href{https://aiagentbros.com/}{AI Agent Bros}}{Sep 2024 -- Feb 2026}\\[2pt]
+{\small
+\begin{itemize}
+  \item Founded a B2B AI consultancy; scoped, built, and delivered 27+ automation solutions for 20+ clients across the US, UK, and Australia covering outreach, CRM automation, ATS screening, and proposal generation.
+  \item Designed agent pipelines using LangChain, OpenAI API, n8n, and Python; grew Converzia, an outreach product built on this stack, to \$700+/month in recurring revenue.
+  \item Completed a public \textit{30 AI Agents in 30 Days}challenge — fully open-sourced — spanning diverse agent architectures including retrieval, reasoning, and tool-use patterns.
+\end{itemize}
+}
+ 
+%--- PROJECTS ---%
+\section*{Projects}
+ 
+\noindent\entry{Converzia — AI-Driven B2B Sales Outreach Platform}{\href{https://github.com/ujjwaltiwari01/converzia-version-0.3}{GitHub}\enspace|\enspace\href{https://converzia.netlify.app/}{Live Demo}}\\[1.5pt]
+{\small
+\begin{itemize}
+  \item Built an LLM pipeline (Python, LangChain, FastAPI, MongoDB) that analyzes company websites, brand tone, and buyer context to generate personalized outbound emails at scale — achieving \textbf{50--70\% open rates} vs. 15--25\% industry average.
+  \item Deployed autonomous SDR agents replacing manual outreach workflows, scaling cold lead processing from 0 to \textbf{1,000+ leads/day} with fully automated personalization; lifted reply rates by 45\% and CTR by 34\%.
+  \item Adopted by 15+ B2B companies across India, the US, UK, and Australia; enables up to 4$\times$ outbound sales throughput versus manual SDR operations.
+\end{itemize}
+}
+ 
+\vspace{1.5pt}
+\noindent\entry{HireFlow AI — Autonomous Hiring \& Screening Automation System}{\href{https://github.com/ujjwaltiwari01/HireFlow-AI-Where-Hiring-Meets-Automation}{GitHub}\enspace|\enspace\href{https://www.linkedin.com/posts/ujjwal-tiwaree_ai-hiring-automation-activity-7391012182408470528-np2A}{Demo}}\\[1.5pt]
+{\small
+\begin{itemize}
+  \item Engineered a multi-signal candidate evaluation system combining ATS scoring, LLM-based qualitative analysis, and GitHub/portfolio validation — adopted by 5+ startups and agencies, reducing recruiter screening effort by \textbf{70--85\% per hiring cycle}.
+  \item Automated bulk resume processing with explainable scoring logic and audit-ready CSV exports, compressing average screening time \textbf{from hours to under 10 minutes per role}.
+  \item Implemented personalized interview and rejection email automation, saving 20--30 recruiter hours/month and improving candidate experience measurably.
+\end{itemize}
+}
+ 
+\vspace{1.5pt}
+\noindent\entry{AI Legal Agent Team — Contract Review \& Legal Intelligence System}{\href{https://github.com/ujjwaltiwari01/AI-Legal-Agent-Team}{GitHub}\enspace|\enspace\href{https://www.linkedin.com/posts/ujjwal-tiwaree_30days30aiagents-legaltech-startuptools-activity-7396755359065083905-Ov3o}{Demo}}\\[1.5pt]
+{\small
+\begin{itemize}
+  \item Implemented a RAG pipeline over Qdrant with OpenAI embeddings for clause-level retrieval, enabling automated risk flagging, compliance analysis, and contract summarization — reducing manual legal review effort by \textbf{60--75\%}.
+  \item Orchestrated a 4-agent system (Researcher, Analyst, Strategist, Lead) that synthesizes outputs into executive-ready legal reports, lowering legal exposure for SMB teams without dedicated counsel.
+\end{itemize}
+}
+\vspace{-1pt}
+ 
+%--- EDUCATION ---%
+\section*{Education}
+\noindent\entry{B.Tech in Information Technology — Rajkiya Engineering College, Ambedkar Nagar}{2023 -- 2027}\\[1.5pt]
+{\small Head of Technical Club; Member, Startup Incubation Cell.}
+\vspace{-1pt}
+ 
+%--- ACHIEVEMENTS & CERTIFICATIONS ---%
+\section*{Achievements \& Certifications}
+{\small
+\begin{itemize}
+  \item \textbf{3$\times$ National Hackathon Winner} — recognized for building production-ready AI systems with measurable business impact across 1,000+ participant fields.
+  \item Collaborated with \textbf{Harsh Mariwala} (Founder \& Chairman, Marico — Fortune 500) to build an AI avatar replicating leadership communication and strategic reasoning.
+  \item Built and scaled Converzia to 20+ B2B clients across 4 countries, achieving 45--70\% email open rates and enabling 4$\times$ outbound sales throughput for client teams.
+  \item \textbf{Certifications:} Generative AI — IBM\enspace\textbullet\enspace Python for ML — Amazon AWS\enspace\textbullet\enspace LangChain for LLM Apps — IBM\enspace\textbullet\enspace Prompt Engineering — OpenAI
+\end{itemize}
+}
+ 
+\end{document}

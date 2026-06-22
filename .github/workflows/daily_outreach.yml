@@ -1,0 +1,41 @@
+name: Daily Outreach
+
+on:
+  schedule:
+    - cron: "30 13 * * *"  # 7:00 PM IST — starts chunk loop
+  workflow_dispatch:
+
+jobs:
+  trigger-outreach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.RENDER_URL }}" ] || [ -z "${{ secrets.JOB_SECRET }}" ]; then
+            echo "RENDER_URL and JOB_SECRET must be set in GitHub repository secrets"
+            exit 1
+          fi
+
+      - name: Run outreach chunks until complete
+        env:
+          RENDER_URL: ${{ secrets.RENDER_URL }}
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
+        run: |
+          set -e
+          for i in $(seq 1 36); do
+            echo "=== Chunk $i/36 ==="
+            body=$(curl -sf -X POST "${RENDER_URL}/jobs/daily-outreach" \
+              -H "Authorization: Bearer ${JOB_SECRET}" \
+              -H "Content-Type: application/json")
+            echo "$body"
+            completed=$(echo "$body" | python3 -c "import sys,json; print(json.load(sys.stdin).get('completed', False))")
+            if [ "$completed" = "True" ]; then
+              echo "Daily outreach complete."
+              exit 0
+            fi
+            echo "Waiting 10 minutes before next chunk..."
+            sleep 600
+          done
+          echo "Reached max chunks — job may still be running. Check /jobs status on Render."
+          exit 1
