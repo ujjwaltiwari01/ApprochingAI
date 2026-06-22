@@ -96,3 +96,27 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: JOB_SECRET
         sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY_2
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: LLM_PROVIDERS
+        value: mistral,cerebras,openrouter,gemini,groq
+      - key: LLM_TIMEOUT_SECONDS
+        value: "30"
+      - key: LLM_REQUEST_DELAY_MS
+        value: "400"
+      - key: LLM_MAX_CONCURRENT
+        value: "2"
+      - key: LLM_EMAIL_MAX_RETRIES
+        value: "1"
+      - key: LLM_COMPACT_ANALYSIS
+        value: "true"
