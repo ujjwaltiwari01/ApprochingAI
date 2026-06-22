@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 
 from bs4 import BeautifulSoup
 from loguru import logger
-from playwright.async_api import async_playwright
 from sqlalchemy import select
 
 from src.core.config import get_settings
@@ -108,6 +107,8 @@ class WebsiteAnalyzer:
         return analysis
 
     async def _scrape_pages(self, base_url: str) -> dict[str, str]:
+        from playwright.async_api import async_playwright
+
         contents: dict[str, str] = {}
 
         async with async_playwright() as p:
