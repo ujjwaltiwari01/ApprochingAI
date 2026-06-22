@@ -8,6 +8,8 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: SUPABASE_POOLER_HOST
+        value: aws-1-ap-northeast-2.pooler.supabase.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY

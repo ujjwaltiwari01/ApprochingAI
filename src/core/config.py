@@ -1,4 +1,6 @@
 from functools import lru_cache
+import os
+import re
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,7 +19,21 @@ class Settings(BaseSettings):
         url = value.strip().strip('"').strip("'")
         if url.startswith("postgresql://") and "+asyncpg" not in url:
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        pooler_host = os.getenv("SUPABASE_POOLER_HOST", "").strip()
+        if pooler_host:
+            match = re.search(
+                r"^postgresql\+asyncpg://postgres:([^@]+)@db\.([^.]+)\.supabase\.co:5432/(.+)$",
+                url,
+            )
+            if match:
+                password, project_ref, dbname = match.groups()
+                url = (
+                    f"postgresql+asyncpg://postgres.{project_ref}:{password}"
+                    f"@{pooler_host}:5432/{dbname}"
+                )
         return url
+
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", alias="SUPABASE_SERVICE_ROLE_KEY")
 
