@@ -7,6 +7,7 @@ from loguru import logger
 
 from src.core.config import get_settings
 from src.services.llm_client import LLMClient
+from src.utils.compact_analysis import compact_agency_analysis
 from src.utils.lead_row_normalizer import recipient_greeting_instruction
 
 BUZZWORDS = [
