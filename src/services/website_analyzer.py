@@ -27,6 +27,7 @@ from src.core.config import get_settings
 from src.db.models import Lead, LeadStatus, ScrapeStatus, WebsiteCache, async_session
 from src.services.llm_client import LLMClient
 from src.utils.agency_analysis import agency_analysis_from_csv_raw
+from src.utils.url_normalizer import normalize_website
 
 PAGES = ["/", "/about", "/services", "/team", "/case-studies", "/blog", "/capabilities"]
 PAGE_KEYS = {

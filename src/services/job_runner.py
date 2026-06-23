@@ -190,6 +190,21 @@ class JobRunner:
                 .limit(1)
             )
             job = result.scalar_one_or_none()
+            if job and job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
+                cp = job.checkpoint or {}
+                stats = cp.get("new_stats") or {}
+                errors = int(stats.get("errors", 0))
+                sent = int(cp.get("new_sent_count", 0))
+                processed = len(cp.get("processed_lead_ids") or [])
+                # Stuck job: many failures, no sends since early chunks — start a fresh job today
+                if errors >= 30 and processed >= 15 and sent < self.settings.daily_new_per_account * 3:
+                    logger.warning(
+                        f"Abandoning stuck job {job.id} (sent={sent}, errors={errors}, processed={processed})"
+                    )
+                    job.status = JobStatus.FAILED
+                    job.completed_at = datetime.now(timezone.utc)
+                    await session.commit()
+                    job = None
             if job:
                 return job
 
