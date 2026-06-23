@@ -43,6 +43,18 @@ class BatchProcessor:
 
         for lead in leads:
             try:
+                # Re-load row so we never act on stale status from a prior chunk/session
+                async with async_session() as session:
+                    result = await session.execute(select(Lead).where(Lead.id == lead.id))
+                    db_lead = result.scalar_one_or_none()
+                if not db_lead:
+                    stats["errors"] += 1
+                    continue
+                if db_lead.status != LeadStatus.NEW or db_lead.message_id or db_lead.sent_at:
+                    logger.info(f"Skipping lead {db_lead.id} — already processed (status={db_lead.status})")
+                    continue
+                lead = db_lead
+
                 analysis = await self.analyzer.analyze_for_lead(lead)
                 await self.analyzer.update_lead_status(lead.id, analysis)
                 stats["analyzed"] += 1

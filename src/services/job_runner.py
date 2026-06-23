@@ -39,6 +39,31 @@ class JobRunner:
             return self._chunk_response(job, completed=True, message="Already completed today")
 
         checkpoint = dict(job.checkpoint or {})
+        # Legacy field from older deploys — causes stuck pagination if left in JSON
+        legacy_offset = int(checkpoint.pop("new_offset", 0) or 0)
+        processed_lead_ids: set[str] = set(checkpoint.get("processed_lead_ids") or [])
+        if legacy_offset and not processed_lead_ids:
+            # In-flight job from pre-fix deploy: seed skip list so chunk 2+ moves forward
+            async with async_session() as session:
+                result = await session.execute(
+                    select(Lead.id)
+                    .where(
+                        Lead.status == LeadStatus.NEW,
+                        Lead.do_not_contact.is_(False),
+                    )
+                    .order_by(
+                        Lead.match_score.desc(),
+                        Lead.hiring_probability.desc(),
+                        Lead.lead_source.desc(),
+                    )
+                    .limit(legacy_offset)
+                )
+                for lead_id in result.scalars().all():
+                    processed_lead_ids.add(str(lead_id))
+            checkpoint["processed_lead_ids"] = sorted(processed_lead_ids)
+            logger.info(
+                f"Migrated legacy new_offset={legacy_offset} → {len(processed_lead_ids)} processed_lead_ids"
+            )
         followup_stats = dict(checkpoint.get("followup_stats", {}))
         new_stats = dict(checkpoint.get("new_stats", {}))
         chunk = self.settings.job_chunk_size  # Default 15 — tuned for Render timeout + LLM latency
@@ -71,10 +96,14 @@ class JobRunner:
                 remaining = min(chunk_budget, daily_new_cap - new_sent_today)
 
                 async with async_session() as session:
-                    result = await session.execute(
+                    query = (
                         select(Lead)
-                        .where(Lead.status == LeadStatus.NEW, Lead.do_not_contact.is_(False))
-                        # No OFFSET — processed leads leave NEW status; always top scorers next
+                        .where(
+                            Lead.status == LeadStatus.NEW,
+                            Lead.do_not_contact.is_(False),
+                            Lead.sent_at.is_(None),
+                            Lead.message_id.is_(None),
+                        )
                         .order_by(
                             Lead.match_score.desc(),
                             Lead.hiring_probability.desc(),
@@ -82,6 +111,9 @@ class JobRunner:
                         )
                         .limit(remaining)
                     )
+                    if processed_lead_ids:
+                        query = query.where(Lead.id.not_in([uuid.UUID(x) for x in processed_lead_ids]))
+                    result = await session.execute(query)
                     new_leads = list(result.scalars().all())
 
                 if new_leads:
@@ -90,6 +122,10 @@ class JobRunner:
                         new_stats[key] = new_stats.get(key, 0) + val
                     new_sent_today += batch_stats.get("sent", 0)
                     checkpoint["new_sent_count"] = new_sent_today
+                    # Never retry same lead in this daily job — even if send/DB partially failed
+                    for lead in new_leads:
+                        processed_lead_ids.add(str(lead.id))
+                    checkpoint["processed_lead_ids"] = sorted(processed_lead_ids)
                 else:
                     checkpoint["new_done"] = True
 
