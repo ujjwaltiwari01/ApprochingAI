@@ -17,12 +17,17 @@ status_filter = st.selectbox(
     "Filter by status",
     ["All"] + LEAD_STATUSES,
 )
+source_filter = st.selectbox(
+    "Lead source",
+    ["All", "usa_owners", "agency_list"],
+)
 score_min = st.slider("Minimum match score", 0, 100, 0)
 limit = st.number_input("Max results", 10, 1000, 100)
 
 try:
     leads = fetch_leads(
         status=None if status_filter == "All" else status_filter,
+        lead_source=source_filter,
         score_min=score_min,
         limit=int(limit),
     )
@@ -31,6 +36,7 @@ try:
             "Company": l.get("company_name"),
             "Email": l.get("email"),
             "Country": l.get("country"),
+            "Source": l.get("lead_source"),
             "Status": l.get("status"),
             "Match Score": l.get("match_score"),
             "Hiring Prob": l.get("hiring_probability"),

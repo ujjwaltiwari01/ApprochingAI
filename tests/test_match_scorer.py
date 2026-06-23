@@ -25,6 +25,26 @@ def test_marketing_agency_score():
     assert category == "marketing"
 
 
+def test_usa_owner_priority_boost():
+    row = {
+        "Name": "Jane",
+        "Last Name": "Doe",
+        "Title": "Marketing Director",
+        "Seniority": "Director",
+        "email": "jane@acmeagency.com",
+        "Company Name for Emails": "Acme Agency",
+        "website": "http://www.acmeagency.com",
+        "Industry": "marketing & advertising",
+        "Keywords": "seo, ppc, digital marketing, branding",
+        "SEO Description": "Full-service digital marketing agency",
+        "Country": "United States",
+    }
+    score, hiring, category = score_lead(row)
+    assert category == "marketing"
+    assert score >= 100 or score >= 93
+    assert hiring >= 15
+
+
 def test_hiring_probability():
     prob = compute_hiring_probability(
         description="We are hiring AI engineers and growing our team",

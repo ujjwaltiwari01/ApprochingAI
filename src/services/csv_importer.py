@@ -4,28 +4,55 @@ from sqlalchemy import func, select
 
 from src.db.models import Lead, LeadStatus, ScrapeStatus, WebsiteCache, async_session
 from src.services.match_scorer import score_lead
+from src.utils.lead_row_normalizer import LEAD_SOURCE_USA_OWNERS, normalize_lead_fields, scoring_fields_from_row
 from src.utils.url_normalizer import is_valid_email, normalize_email, normalize_website
 
 
 def _row_to_lead(row: dict) -> dict | None:
-    email = normalize_email(row.get("Email"))
+    fields = normalize_lead_fields(row)
+    email = normalize_email(row.get(fields["email_key"]))
     if not email or not is_valid_email(email):
         return None
 
     match_score, hiring_prob, _ = score_lead(row)
-    website = normalize_website(row.get("Website"))
+    website = normalize_website(row.get(fields["website_key"]))
 
     return {
-        "name": row.get("Name", "").strip() or None,
+        "name": fields["name"],
         "email": email,
-        "company_name": row.get("Name", "").strip() or None,
+        "company_name": fields["company_name"],
         "website": website,
-        "country": row.get("Country", "").strip() or None,
+        "country": fields["country"],
         "status": LeadStatus.NEW,
         "match_score": match_score,
         "hiring_probability": hiring_prob,
+        "lead_source": fields["lead_source"],
         "csv_raw": {k: (v if pd.notna(v) else None) for k, v in row.items()},
     }
+
+
+def _merge_existing_lead(existing: Lead, lead_data: dict) -> None:
+    existing.name = lead_data["name"] or existing.name
+    existing.company_name = lead_data["company_name"] or existing.company_name
+    existing.website = lead_data["website"] or existing.website
+    existing.country = lead_data["country"] or existing.country
+    existing.csv_raw = lead_data["csv_raw"]
+
+    # Keep the higher priority score; USA owners win ties on same score.
+    new_score = lead_data["match_score"]
+    if new_score > existing.match_score:
+        existing.match_score = new_score
+        existing.hiring_probability = lead_data["hiring_probability"]
+        existing.lead_source = lead_data["lead_source"]
+    elif (
+        new_score == existing.match_score
+        and lead_data["lead_source"] == LEAD_SOURCE_USA_OWNERS
+        and existing.lead_source != LEAD_SOURCE_USA_OWNERS
+    ):
+        existing.hiring_probability = max(existing.hiring_probability, lead_data["hiring_probability"])
+        existing.lead_source = LEAD_SOURCE_USA_OWNERS
+    elif lead_data["lead_source"] == LEAD_SOURCE_USA_OWNERS and existing.status == LeadStatus.NEW:
+        existing.hiring_probability = max(existing.hiring_probability, lead_data["hiring_probability"])
 
 
 async def import_csv(csv_path, chunk_size: int = 1000) -> dict:
@@ -53,12 +80,7 @@ async def import_csv(csv_path, chunk_size: int = 1000) -> dict:
                     existing = result.scalar_one_or_none()
 
                     if existing:
-                        existing.company_name = lead_data["company_name"]
-                        existing.website = lead_data["website"]
-                        existing.country = lead_data["country"]
-                        existing.match_score = lead_data["match_score"]
-                        existing.hiring_probability = lead_data["hiring_probability"]
-                        existing.csv_raw = lead_data["csv_raw"]
+                        _merge_existing_lead(existing, lead_data)
                         stats["updated"] += 1
                     else:
                         session.add(Lead(**lead_data))
@@ -73,6 +95,31 @@ async def import_csv(csv_path, chunk_size: int = 1000) -> dict:
     return stats
 
 
+def _cache_fields_from_row(row: dict) -> dict | None:
+    scoring = scoring_fields_from_row(row)
+    fields = normalize_lead_fields(row)
+    website = normalize_website(row.get(fields["website_key"]))
+    if not website:
+        return None
+
+    description = scoring.get("description", "")
+    services = scoring.get("services", "")
+    team = scoring.get("team_bios", "")
+    if not description and not services:
+        return None
+
+    summary = description[:2000] if description else services[:1000]
+    return {
+        "website": website,
+        "description": description,
+        "services": services,
+        "team": team,
+        "summary": summary,
+        "industry": scoring.get("industries", ""),
+        "specialization": scoring.get("expertise", ""),
+    }
+
+
 async def seed_website_cache_from_csv(csv_path, chunk_size: int = 1000) -> int:
     from pathlib import Path
 
@@ -82,42 +129,34 @@ async def seed_website_cache_from_csv(csv_path, chunk_size: int = 1000) -> int:
     for chunk in pd.read_csv(csv_path, chunksize=chunk_size, dtype=str, keep_default_na=False):
         async with async_session() as session:
             for _, row in chunk.iterrows():
-                website = normalize_website(row.get("Website"))
-                if not website:
-                    continue
-
-                description = row.get("Description", "") or ""
-                services = row.get("Services", "") or ""
-                team = row.get("Team Bios ", row.get("Team Bios", "")) or ""
-
-                if not description and not services:
+                cache_fields = _cache_fields_from_row(row.to_dict())
+                if not cache_fields:
                     continue
 
                 existing = await session.execute(
-                    select(WebsiteCache).where(WebsiteCache.website == website)
+                    select(WebsiteCache).where(WebsiteCache.website == cache_fields["website"])
                 )
                 if existing.scalar_one_or_none():
                     continue
 
-                summary = description[:2000] if description else services[:1000]
                 analysis = {
-                    "industry": row.get("Industries", ""),
-                    "positioning": row.get("Slogan", ""),
-                    "services": [s.strip() for s in services.split(",") if s.strip()],
-                    "specialization": row.get("Areas of Expertise", ""),
+                    "industry": cache_fields["industry"],
+                    "positioning": "",
+                    "services": [s.strip() for s in cache_fields["services"].split(",") if s.strip()],
+                    "specialization": cache_fields["specialization"],
                     "hiring_probability": 0,
-                    "summary": summary,
+                    "summary": cache_fields["summary"],
                 }
 
                 cache = WebsiteCache(
-                    website=website,
-                    homepage_content=description[:5000],
-                    services_content=services[:3000],
-                    about_content=description[:3000],
-                    team_content=team[:3000],
-                    summary=summary,
-                    industry=row.get("Industries", ""),
-                    specialization=row.get("Areas of Expertise", ""),
+                    website=cache_fields["website"],
+                    homepage_content=cache_fields["description"][:5000],
+                    services_content=cache_fields["services"][:3000],
+                    about_content=cache_fields["description"][:3000],
+                    team_content=cache_fields["team"][:3000],
+                    summary=cache_fields["summary"],
+                    industry=cache_fields["industry"],
+                    specialization=cache_fields["specialization"],
                     scrape_status=ScrapeStatus.CACHED,
                     analysis_json=analysis,
                 )

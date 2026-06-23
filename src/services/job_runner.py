@@ -59,7 +59,11 @@ class JobRunner:
                     result = await session.execute(
                         select(Lead)
                         .where(Lead.status == LeadStatus.NEW, Lead.do_not_contact.is_(False))
-                        .order_by(Lead.match_score.desc())
+                        .order_by(
+                            Lead.match_score.desc(),
+                            Lead.hiring_probability.desc(),
+                            Lead.lead_source.desc(),
+                        )
                         .offset(offset)
                         .limit(remaining)
                     )

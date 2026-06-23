@@ -88,15 +88,22 @@ LEAD_STATUSES = [
 ]
 
 
-def fetch_leads(status: str | None = None, score_min: int = 0, limit: int = 100) -> list[dict]:
+def fetch_leads(
+    status: str | None = None,
+    score_min: int = 0,
+    lead_source: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
     params = [
         f"match_score=gte.{score_min}",
-        "order=match_score.desc",
+        "order=match_score.desc,hiring_probability.desc,lead_source.desc",
         f"limit={limit}",
-        "select=company_name,email,country,status,match_score,hiring_probability,sent_at,replied_at",
+        "select=company_name,email,country,status,match_score,hiring_probability,lead_source,sent_at,replied_at",
     ]
     if status and status != "All":
         params.append(f"status=eq.{status}")
+    if lead_source and lead_source != "All":
+        params.append(f"lead_source=eq.{lead_source}")
 
     url = f"{_url()}/rest/v1/leads?" + "&".join(params)
     r = httpx.get(url, headers=_headers(), timeout=30)

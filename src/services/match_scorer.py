@@ -1,3 +1,9 @@
+from src.utils.lead_row_normalizer import (
+    LEAD_SOURCE_USA_OWNERS,
+    is_direct_decision_maker_email,
+    scoring_fields_from_row,
+)
+
 CATEGORY_SCORES = {
     "ai_agency": 95,
     "automation_agency": 90,
@@ -7,6 +13,11 @@ CATEGORY_SCORES = {
     "general_business": 50,
     "unrelated": 20,
 }
+
+USA_OWNER_SOURCE_BOOST = 20
+USA_DECISION_MAKER_BOOST = 8
+USA_DIRECT_EMAIL_BOOST = 5
+USA_HIRING_DECISION_MAKER_BOOST = 15
 
 AI_KEYWORDS = [
     "ai development", "artificial intelligence", "machine learning", "llm",
@@ -32,6 +43,11 @@ MARKETING_KEYWORDS = [
 CONSULTING_KEYWORDS = [
     "consulting", "strategy", "advisory", "digital transformation",
     "business consulting", "it consulting",
+]
+
+DECISION_MAKER_KEYWORDS = [
+    "c suite", "founder", "owner", "ceo", "cmo", "cto", "president",
+    "director", "vp", "partner", "head of",
 ]
 
 HIRING_SIGNALS = [
@@ -77,19 +93,39 @@ def compute_hiring_probability(description: str = "", team_bios: str = "", servi
     return min(score, 100)
 
 
+def _apply_usa_owner_boosts(match_score: int, hiring_prob: int, scoring: dict) -> tuple[int, int]:
+    if scoring.get("lead_source") != LEAD_SOURCE_USA_OWNERS:
+        return match_score, hiring_prob
+
+    match_score = min(match_score + USA_OWNER_SOURCE_BOOST, 100)
+
+    role_text = f"{scoring.get('title', '')} {scoring.get('seniority', '')} {scoring.get('expertise', '')}".lower()
+    if _text_contains(role_text, DECISION_MAKER_KEYWORDS):
+        match_score = min(match_score + USA_DECISION_MAKER_BOOST, 100)
+        hiring_prob = min(hiring_prob + USA_HIRING_DECISION_MAKER_BOOST, 100)
+
+    email = scoring.get("email", "")
+    if is_direct_decision_maker_email(email):
+        match_score = min(match_score + USA_DIRECT_EMAIL_BOOST, 100)
+
+    return match_score, hiring_prob
+
+
 def score_lead(row: dict) -> tuple[int, int, str]:
+    scoring = scoring_fields_from_row(row)
     category, match_score = classify_agency(
-        services=row.get("Services", "") or "",
-        description=row.get("Description", "") or "",
-        expertise=row.get("Areas of Expertise", "") or "",
-        industries=row.get("Industries", "") or "",
+        services=scoring.get("services", ""),
+        description=scoring.get("description", ""),
+        expertise=scoring.get("expertise", ""),
+        industries=scoring.get("industries", ""),
     )
     hiring_prob = compute_hiring_probability(
-        description=row.get("Description", "") or "",
-        team_bios=row.get("Team Bios ", row.get("Team Bios", "")) or "",
-        services=row.get("Services", "") or "",
+        description=scoring.get("description", ""),
+        team_bios=scoring.get("team_bios", ""),
+        services=scoring.get("services", ""),
     )
-    # Boost match score for high hiring probability
     if hiring_prob >= 40:
         match_score = min(match_score + 5, 100)
+
+    match_score, hiring_prob = _apply_usa_owner_boosts(match_score, hiring_prob, scoring)
     return match_score, hiring_prob, category

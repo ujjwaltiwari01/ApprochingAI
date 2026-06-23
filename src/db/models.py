@@ -95,6 +95,7 @@ class Lead(Base):
     last_email_body: Mapped[str | None] = mapped_column(Text)
     match_score: Mapped[int] = mapped_column(Integer, default=50)
     hiring_probability: Mapped[int] = mapped_column(Integer, default=0)
+    lead_source: Mapped[str] = mapped_column(String(32), default="agency_list")
     csv_raw: Mapped[dict | None] = mapped_column(JSONB)
     brevo_account: Mapped[int | None] = mapped_column(Integer)
     message_id: Mapped[str | None] = mapped_column(Text)
