@@ -2,8 +2,15 @@ name: Daily Outreach
 
 on:
   schedule:
-    - cron: "30 13 * * *"  # 7:00 PM IST — starts chunk loop
+    # 7:00 PM IST — primary run (13:30 UTC)
+    - cron: "30 13 * * *"
+    # 1:00 AM IST — continuation if primary hits 6h limit or max chunks (19:30 UTC)
+    - cron: "30 19 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: daily-outreach
+  cancel-in-progress: false
 
 jobs:
   trigger-outreach:
@@ -42,14 +49,23 @@ jobs:
         run: |
           set -e
           base="${RENDER_URL%/}"
+          # 36 chunks × (~4 min process + 5 min wait) ≈ 5.4h — fits GitHub 6h limit
           for i in $(seq 1 36); do
             echo "=== Chunk $i/36 ==="
-            http_code=$(curl -s -o /tmp/chunk.json -w "%{http_code}" -X POST "${base}/jobs/daily-outreach" \
-              -H "Authorization: Bearer ${JOB_SECRET}" \
-              -H "Content-Type: application/json")
-            body=$(cat /tmp/chunk.json)
-            echo "HTTP ${http_code}"
-            echo "$body"
+            for attempt in 1 2 3; do
+              http_code=$(curl -s -o /tmp/chunk.json -w "%{http_code}" -X POST "${base}/jobs/daily-outreach" \
+                -H "Authorization: Bearer ${JOB_SECRET}" \
+                -H "Content-Type: application/json")
+              body=$(cat /tmp/chunk.json)
+              echo "HTTP ${http_code} (attempt ${attempt})"
+              echo "$body"
+              if [ "$http_code" = "409" ]; then
+                echo "Chunk already running — waiting 2 minutes before retry..."
+                sleep 120
+                continue
+              fi
+              break
+            done
             if [ "$http_code" = "401" ]; then
               echo "JOB_SECRET mismatch: copy JOB_SECRET from Render outreach-api Environment into GitHub secrets."
               exit 1
@@ -63,8 +79,10 @@ jobs:
               echo "Daily outreach complete."
               exit 0
             fi
-            echo "Waiting 10 minutes before next chunk..."
-            sleep 600
+            if [ "$i" -lt 36 ]; then
+              echo "Waiting 5 minutes before next chunk..."
+              sleep 300
+            fi
           done
-          echo "Reached max chunks — job may still be running. Check /jobs status on Render."
-          exit 1
+          echo "Reached max chunks without completion — continuation run at 1 AM IST will resume today's job."
+          exit 0
