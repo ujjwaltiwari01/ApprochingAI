@@ -104,7 +104,7 @@ def fetch_leads(
     """Paginated lead list for the Leads page — ordered by outreach priority."""
     params = [
         f"match_score=gte.{score_min}",
-        "order=match_score.desc,hiring_probability.desc,lead_source.desc",
+        "order=lead_source.desc,match_score.desc,hiring_probability.desc",
         f"limit={limit}",
         "select=company_name,email,country,status,match_score,hiring_probability,lead_source,sent_at,replied_at",
     ]

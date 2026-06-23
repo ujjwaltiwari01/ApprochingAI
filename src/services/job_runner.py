@@ -16,12 +16,22 @@ import uuid
 from datetime import datetime, timezone
 
 from loguru import logger
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 
 from src.core.config import get_settings
 from src.db.models import Job, JobStatus, JobType, Lead, LeadStatus, async_session
 from src.services.batch_processor import BatchProcessor
 from src.services.followup_engine import FollowupEngine
+from src.utils.lead_row_normalizer import LEAD_SOURCE_USA_OWNERS
+
+
+def _new_lead_send_order():
+    """USA owners always before agency_list; then score and hiring probability."""
+    return (
+        case((Lead.lead_source == LEAD_SOURCE_USA_OWNERS, 0), else_=1),
+        Lead.match_score.desc(),
+        Lead.hiring_probability.desc().nulls_last(),
+    )
 
 
 class JobRunner:
@@ -51,11 +61,7 @@ class JobRunner:
                         Lead.status == LeadStatus.NEW,
                         Lead.do_not_contact.is_(False),
                     )
-                    .order_by(
-                        Lead.match_score.desc(),
-                        Lead.hiring_probability.desc(),
-                        Lead.lead_source.desc(),
-                    )
+                    .order_by(*_new_lead_send_order())
                     .limit(legacy_offset)
                 )
                 for lead_id in result.scalars().all():
@@ -104,11 +110,7 @@ class JobRunner:
                             Lead.sent_at.is_(None),
                             Lead.message_id.is_(None),
                         )
-                        .order_by(
-                            Lead.match_score.desc(),
-                            Lead.hiring_probability.desc(),
-                            Lead.lead_source.desc(),  # usa_owners > agency_list on ties
-                        )
+                        .order_by(*_new_lead_send_order())
                         .limit(remaining)
                     )
                     if processed_lead_ids:

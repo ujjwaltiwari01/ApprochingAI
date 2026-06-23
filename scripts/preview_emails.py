@@ -51,7 +51,7 @@ def fetch_top_leads(limit: int, min_score: int) -> list[dict]:
     url = (
         f"{os.getenv('SUPABASE_URL').rstrip('/')}/rest/v1/leads"
         f"?status=eq.NEW&match_score=gte.{min_score}"
-        f"&order=match_score.desc&limit={limit}"
+        f"&order=lead_source.desc,match_score.desc,hiring_probability.desc&limit={limit}"
         "&select=id,company_name,name,email,website,country,match_score,hiring_probability,lead_source,csv_raw"
     )
     r = httpx.get(url, headers=_supabase_headers(), timeout=30)
