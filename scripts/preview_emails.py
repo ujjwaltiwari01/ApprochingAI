@@ -20,6 +20,7 @@ from src.core.config import get_settings
 get_settings.cache_clear()
 
 from src.services.email_generator import EmailGenerator
+from src.utils.lead_row_normalizer import recipient_first_name_from_lead
 from src.utils.url_normalizer import normalize_website
 
 
@@ -37,7 +38,7 @@ def fetch_top_leads(limit: int, min_score: int) -> list[dict]:
         f"{os.getenv('SUPABASE_URL').rstrip('/')}/rest/v1/leads"
         f"?status=eq.NEW&match_score=gte.{min_score}"
         f"&order=match_score.desc&limit={limit}"
-        "&select=id,company_name,email,website,country,match_score,hiring_probability,csv_raw"
+        "&select=id,company_name,name,email,website,country,match_score,hiring_probability,lead_source,csv_raw"
     )
     r = httpx.get(url, headers=_supabase_headers(), timeout=30)
     r.raise_for_status()
@@ -176,7 +177,9 @@ async def generate_previews(count: int, min_score: int, include_followup: bool) 
 
         analysis = get_agency_analysis(lead)
         subject, body, provider, valid, subject_candidates = await generator.generate_initial_email(
-            company, analysis
+            company,
+            analysis,
+            recipient_first_name=recipient_first_name_from_lead(lead),
         )
         validation = generator.validate_email_details(subject, body, analysis)
 
@@ -194,6 +197,7 @@ async def generate_previews(count: int, min_score: int, include_followup: bool) 
                 followup_number=1,
                 previous_subject=subject,
                 engagement_type="opened_no_reply",
+                recipient_first_name=recipient_first_name_from_lead(lead),
             )
             sections.append("### Follow-up #1 (preview)")
             sections.append("")

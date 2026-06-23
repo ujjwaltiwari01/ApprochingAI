@@ -29,8 +29,8 @@ CREDENTIAL MATCHING GUIDE — pick ONE based on the agency:
 
 If the agency builds products for clients, runs a dev shop, 
 or does client delivery:
-  Use: Founded and ran a B2B AI consultancy delivering 27+ 
-  automation systems to clients across US, UK, Australia. 
+  Use: Founded and ran a B2B AI consultancy delivering 50+ 
+  automation systems to clients across US, UK, Australia.
   I know how agency work actually runs.
 
 If the agency works in enterprise, finance, ops, or data:
@@ -87,7 +87,7 @@ UCLA, which usually means tight timelines and clients who need
 AI workflows that actually hold up in production.
 
 I have spent the last year and a half building and running an 
-AI consultancy that delivered 27+ automation systems to clients 
+AI consultancy that delivered 50+ automation systems to clients
 across the US, UK, and Australia, so I understand how 
 client-facing engineering actually works.
 
@@ -113,6 +113,8 @@ AGENCY CONTEXT (read carefully before writing)
 ============================================================
 Agency name: {company_name}
 Agency analysis: {agency_analysis}
+
+{recipient_greeting_instruction}
 
 ============================================================
 EMAIL RULES (non-negotiable)

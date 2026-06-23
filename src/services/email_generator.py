@@ -7,7 +7,7 @@ from loguru import logger
 
 from src.core.config import get_settings
 from src.services.llm_client import LLMClient
-from src.utils.compact_analysis import compact_agency_analysis
+from src.utils.lead_row_normalizer import recipient_greeting_instruction
 
 BUZZWORDS = [
     "synergy", "leverage", "cutting-edge", "game-changer", "revolutionary",
@@ -47,16 +47,21 @@ class EmailGenerator:
         return json.dumps(data, indent=2)
 
     async def generate_initial_email(
-        self, company_name: str, agency_analysis: dict
+        self,
+        company_name: str,
+        agency_analysis: dict,
+        recipient_first_name: str | None = None,
     ) -> tuple[str, str, str, bool, list[str]]:
         """Returns (subject, body, provider, validation_passed, subject_candidates)."""
         analysis_json = self._analysis_for_prompt(agency_analysis)
+        greeting_instruction = recipient_greeting_instruction(recipient_first_name)
         prompt = self._load_prompt("master_email.txt").format(
             portfolio_url=self.settings.sender_portfolio_url,
             linkedin_url=self.settings.sender_linkedin_url,
             sender_profile=self.sender_profile,
             agency_analysis=analysis_json,
             company_name=company_name,
+            recipient_greeting_instruction=greeting_instruction,
         )
         subject_prompt = self._load_prompt("subject_lines.txt").format(
             company_name=company_name,
@@ -116,6 +121,7 @@ class EmailGenerator:
         followup_number: int,
         previous_subject: str,
         engagement_type: str,
+        recipient_first_name: str | None = None,
     ) -> tuple[str, str, str, bool]:
         resume_line = ""
         if followup_number >= 2 and self.settings.sender_resume_url:
@@ -130,6 +136,7 @@ class EmailGenerator:
             linkedin_url=self.settings.sender_linkedin_url,
             resume_line=resume_line,
             agency_analysis=self._analysis_for_prompt(agency_analysis),
+            recipient_greeting_instruction=recipient_greeting_instruction(recipient_first_name),
         )
         text, provider = await self.llm.generate(prompt, max_tokens=400, task="followup")
         subject, body = self._parse_email_output(text)

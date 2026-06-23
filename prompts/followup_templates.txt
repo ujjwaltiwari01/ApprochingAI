@@ -1,5 +1,7 @@
 Write a follow-up email for {company_name}.
 
+{recipient_greeting_instruction}
+
 Follow-up number: {followup_number}
 Previous subject: {previous_subject}
 Engagement: {engagement_type}

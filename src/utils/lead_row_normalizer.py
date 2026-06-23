@@ -104,3 +104,41 @@ def normalize_lead_fields(row: dict) -> dict:
 def is_direct_decision_maker_email(email: str) -> bool:
     lower = email.lower().strip()
     return bool(lower) and not any(lower.startswith(prefix) for prefix in GENERIC_EMAIL_PREFIXES)
+
+
+def recipient_first_name_from_lead(lead) -> str | None:
+    """Return first name for email greeting when the lead is a named USA contact."""
+    source = getattr(lead, "lead_source", None)
+    if source is None and isinstance(lead, dict):
+        source = lead.get("lead_source")
+
+    if source != LEAD_SOURCE_USA_OWNERS:
+        return None
+
+    name = getattr(lead, "name", None)
+    if name is None and isinstance(lead, dict):
+        name = lead.get("name")
+        if not name:
+            raw = lead.get("csv_raw") or {}
+            name = raw.get("Name")
+
+    if not name:
+        return None
+
+    first = str(name).strip().split()[0]
+    if first and len(first) >= 2 and first[0].isalpha():
+        return first
+    return None
+
+
+def recipient_greeting_instruction(recipient_first_name: str | None) -> str:
+    if recipient_first_name:
+        return (
+            f"Recipient first name: {recipient_first_name}. "
+            f"You MUST open the email body with 'Hi {recipient_first_name},' on its own line "
+            "before paragraph 1."
+        )
+    return (
+        "No recipient first name is available. Do not use 'Hi there', 'Dear team', "
+        "or other generic greetings. Start directly with the agency observation."
+    )

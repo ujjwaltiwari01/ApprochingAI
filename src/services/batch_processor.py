@@ -7,7 +7,7 @@ from src.core.config import get_settings
 from src.db.models import GeneratedContent, Lead, LeadStatus, async_session
 from src.services.brevo_client import BrevoClient
 from src.services.email_generator import EmailGenerator
-from src.services.followup_engine import FollowupEngine
+from src.utils.lead_row_normalizer import recipient_first_name_from_lead, recipient_greeting_instruction
 from src.services.website_analyzer import WebsiteAnalyzer
 
 
@@ -29,7 +29,9 @@ class BatchProcessor:
                 stats["analyzed"] += 1
 
                 subject, body, provider, valid, _ = await self.generator.generate_initial_email(
-                    lead.company_name or lead.name or "your agency", analysis
+                    lead.company_name or lead.name or "your agency",
+                    analysis,
+                    recipient_first_name=recipient_first_name_from_lead(lead),
                 )
                 stats["generated"] += 1
 
@@ -72,6 +74,7 @@ class BatchProcessor:
                     followup_number=followup_num,
                     previous_subject=lead.last_subject or "",
                     engagement_type=engagement,
+                    recipient_first_name=recipient_first_name_from_lead(lead),
                 )
                 stats["generated"] += 1
 
