@@ -8,7 +8,7 @@ from sqlalchemy import select
 from src.core.config import get_settings
 from src.db.models import Lead, LeadStatus, ScrapeStatus, WebsiteCache, async_session
 from src.services.llm_client import LLMClient
-from src.utils.url_normalizer import normalize_website
+from src.utils.agency_analysis import agency_analysis_from_csv_raw
 
 PAGES = ["/", "/about", "/services", "/team", "/case-studies", "/blog", "/capabilities"]
 PAGE_KEYS = {
@@ -144,17 +144,7 @@ class WebsiteAnalyzer:
         return " ".join(text.split())[:5000]
 
     def _fallback_from_csv(self, lead: Lead) -> dict:
-        raw = lead.csv_raw or {}
-        description = raw.get("Description", "") or ""
-        services = raw.get("Services", "") or ""
-        return {
-            "industry": raw.get("Industries", ""),
-            "positioning": raw.get("Slogan", ""),
-            "services": [s.strip() for s in services.split(",") if s.strip()],
-            "specialization": raw.get("Areas of Expertise", ""),
-            "hiring_probability": lead.hiring_probability,
-            "summary": description[:1000] or services[:500],
-        }
+        return agency_analysis_from_csv_raw(lead.csv_raw, lead.hiring_probability)
 
     async def update_lead_status(self, lead_id, analysis: dict) -> None:
         async with async_session() as session:

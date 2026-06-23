@@ -22,6 +22,11 @@ get_settings.cache_clear()
 from src.services.email_generator import EmailGenerator
 from src.utils.lead_row_normalizer import recipient_first_name_from_lead
 from src.utils.url_normalizer import normalize_website
+from src.utils.agency_analysis import (
+    agency_analysis_from_csv_raw,
+    cache_row_to_analysis,
+    merge_analysis,
+)
 
 
 def _supabase_headers() -> dict:
@@ -60,38 +65,22 @@ def fetch_cache_analysis(website: str) -> dict | None:
     if not rows:
         return None
     row = rows[0]
-    if row.get("analysis_json"):
-        return row["analysis_json"]
-    return {
-        "industry": row.get("industry", ""),
-        "positioning": "",
-        "services": [],
-        "specialization": row.get("specialization", ""),
-        "hiring_probability": 0,
-        "summary": row.get("summary") or (row.get("homepage_content") or "")[:1000],
-    }
+    return cache_row_to_analysis(row)
 
 
 def analysis_from_csv(csv_raw: dict | None, hiring_prob: int) -> dict:
-    raw = csv_raw or {}
-    description = raw.get("Description", "") or ""
-    services = raw.get("Services", "") or ""
-    return {
-        "industry": raw.get("Industries", ""),
-        "positioning": raw.get("Slogan", ""),
-        "services": [s.strip() for s in services.split(",") if s.strip()],
-        "specialization": raw.get("Areas of Expertise", ""),
-        "hiring_probability": hiring_prob,
-        "summary": description[:1000] or services[:500],
-    }
+    return agency_analysis_from_csv_raw(csv_raw, hiring_prob)
 
 
 def get_agency_analysis(lead: dict) -> dict:
+    csv_analysis = agency_analysis_from_csv_raw(
+        lead.get("csv_raw"), lead.get("hiring_probability", 0)
+    )
     if lead.get("website"):
         cached = fetch_cache_analysis(lead["website"])
-        if cached and cached.get("summary"):
-            return cached
-    return analysis_from_csv(lead.get("csv_raw"), lead.get("hiring_probability", 0))
+        if cached:
+            return merge_analysis(cached, csv_analysis)
+    return csv_analysis
 
 
 def word_count(text: str) -> int:
@@ -130,7 +119,9 @@ def format_preview_block(
     lines.extend([
         "",
         "### Agency insight used",
-        f"> {(analysis.get('summary') or analysis.get('positioning') or 'N/A')[:300]}",
+        f"> **Industry:** {analysis.get('industry') or 'N/A'}",
+        f"> **Services:** {', '.join((analysis.get('services') or [])[:6]) or 'N/A'}",
+        f"> **Summary:** {(analysis.get('summary') or analysis.get('positioning') or 'N/A')[:400]}",
         "",
         f"### Subject: {subject}",
         "",
