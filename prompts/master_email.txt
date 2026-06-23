@@ -174,7 +174,7 @@ Before writing the final email, ask yourself:
 ============================================================
 OUTPUT FORMAT (exactly this, nothing else)
 ============================================================
-Subject: [subject line, 5 words or fewer, sentence case, no punctuation]
+Subject: [subject line, 4 to 10 words, sentence case, include company name when possible, no trailing punctuation]
 Email: [email body]
 
 ============================================================

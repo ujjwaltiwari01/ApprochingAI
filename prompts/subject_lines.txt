@@ -2,39 +2,63 @@
 TASK
 ============================================================
 Generate 5 subject lines for a cold outreach email to {company_name}.
-The sender is Ujjwal Tiwari, an AI engineer seeking a role or contract engagement.
+The sender is Ujjwal Tiwari, an AI engineer reaching out about a role or contract engagement.
+This is a peer note, not a sales pitch.
 
-Agency context: {agency_analysis}
+Agency context (read carefully — mine this for specifics):
+{agency_analysis}
 
 ============================================================
-SUBJECT LINE RULES
+SUBJECT LINE STRATEGY
 ============================================================
-Each subject line must be 5 words or fewer.
-Use sentence case only. No title case.
-No punctuation at the end.
-No emojis.
-No spam trigger words: free, guarantee, limited time, act now, opportunity, exciting, urgent.
+Goal: highest open rate. Each line must feel written for {company_name} only.
 
-WHAT WORKS (pick the best fit per line):
-Pattern A: Name a specific thing they do or build
-  Example: "Automating your client onboarding"
-Pattern B: A question that implies you understand their world
-  Example: "How are you handling LLM QA"
-Pattern C: A plain statement of what you bring
-  Example: "AI engineer open to contract work"
-Pattern D: Reference a shared context or tool
-  Example: "Re: your Python AI stack"
-Pattern E: Intrigue without clickbait
-  Example: "Something I noticed on your site"
+PERSONALIZATION (required):
+- At least 3 of 5 lines MUST include {company_name} (or a natural short form, e.g. "Goji" for Goji Labs).
+- Anchor each line to something specific from the agency analysis: a service, client type, stack, niche, or workflow — not just "AI" or "marketing."
+- Never send a line that could apply unchanged to 100 other agencies.
 
-DO NOT use all 5 patterns. Pick the 5 strongest for this specific agency.
-Vary the patterns across the 5 lines.
-At least 2 lines must feel like they were written specifically for {company_name}, not any agency.
+CURIOSITY & PSYCHOLOGY:
+- Use open loops — tease an insight without revealing it in the subject.
+- Pattern interrupts beat predictable cold-email formulas.
+- Micro-personalization, subtle FOMO, and peer tone work. Hype and manipulation do not.
+- Questions and incomplete thoughts are fine. End without a period.
 
-The selected subject line must be the one most specific 
-to this agency. Generic lines like "ai engineer open to 
-contract" should only be selected if no better option exists.
-Rank specificity above all other criteria when selecting.
+BANNED — overused, predictable, or spammy (never use these or close variants):
+- "something i noticed on your site"
+- "noticed something on your site"
+- "quick question"
+- "following up"
+- "ai engineer open to contract"
+- "exciting opportunity"
+- "partnership opportunity"
+- "free", "guarantee", "limited time", "act now", "urgent"
+
+STYLE RULES:
+- 4 to 10 words per line (short enough for mobile, long enough to be specific).
+- Sentence case. No emojis. No trailing period.
+- No title case. No ALL CAPS.
+
+INSPIRATION — adapt the intent, do NOT copy verbatim:
+- "saw something on {company_name}'s site — wild idea inside"
+- "quick thought for {company_name}'s product team"
+- "what most agencies miss (but {company_name} could nail)"
+- "{company_name} and a gap on your homepage"
+- "if i were at {company_name}, i'd want to know this"
+- "one micro-idea for {company_name} — not a pitch"
+- "how {company_name} could ship AI faster"
+- "re {company_name}'s client onboarding stack"
+- "your {specific_service_from_analysis} workflow — quick thought"
+
+VARY the angle across all 5 lines:
+1. Website or product-specific observation (open loop)
+2. Industry or client-niche hook from their analysis
+3. Stack or workflow reference (Python, n8n, LLM, etc. if in analysis)
+4. Peer question that implies you understand their world
+5. Bold but honest curiosity hook with company name
+
+Rank lines by specificity to THIS agency before outputting.
+The best line for selection is the most specific, not the most generic.
 
 ============================================================
 OUTPUT FORMAT
@@ -48,21 +72,9 @@ No explanation. No headers. No extra text.
 4. [subject line]
 5. [subject line]
 
-
-============================================================
-OUTPUT FORMAT — critical
-============================================================
-Output exactly 5 lines. Each line starts with a number, 
-a period, and a space. Nothing else on the line.
-The subject line text only. No arrows. No labels. 
-No "← selected". No explanation.
-All lowercase. No punctuation at the end.
-
-Example of correct output:
-1. ai engineer open to contract
-2. how are you handling llm ops
-3. re your mobile app clients
-4. something i noticed on your site
-5. automating your client onboarding
-============================================================
-
+Example shape (do not copy — write fresh for {company_name}):
+1. goji labs and your who ucla work
+2. saw something on your fintech stack
+3. re your mobile product clients
+4. how you handle llm qa at scale
+5. one thought on your design sprint flow

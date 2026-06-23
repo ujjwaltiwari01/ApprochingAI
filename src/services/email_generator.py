@@ -76,7 +76,7 @@ class EmailGenerator:
 
         (text, provider), (subject_text, _) = await asyncio.gather(
             self.llm.generate(prompt, system=email_system, max_tokens=600, task="initial_email"),
-            self.llm.generate(subject_prompt, max_tokens=200, task="subject_lines"),
+            self.llm.generate(subject_prompt, max_tokens=300, task="subject_lines"),
         )
         subject, body = self._parse_email_output(text)
         subject_candidates = self._parse_subject_lines(subject_text)
@@ -148,7 +148,7 @@ class EmailGenerator:
             company_name=company_name,
             agency_analysis=self._analysis_for_prompt(agency_analysis),
         )
-        text, _ = await self.llm.generate(prompt, max_tokens=200, task="subject_lines")
+        text, _ = await self.llm.generate(prompt, max_tokens=300, task="subject_lines")
         return self._parse_subject_lines(text)
 
     def _parse_subject_lines(self, text: str) -> list[str]:
@@ -157,23 +157,40 @@ class EmailGenerator:
             cleaned = re.sub(r"^\d+[\.\)]\s*", "", line.strip())
             if not cleaned or cleaned.isdigit():
                 continue
-            if len(cleaned.split()) <= 5 and len(cleaned) > 2:
+            word_count = len(cleaned.split())
+            if 3 <= word_count <= 10 and len(cleaned) > 2:
                 lines.append(cleaned)
         return lines[:5]
 
+    _GENERIC_SUBJECT_PATTERNS = (
+        "something i noticed",
+        "noticed something",
+        "on your site",
+        "ai engineer open",
+        "open to contract",
+        "exciting opportunity",
+        "partnership opportunity",
+        "following up",
+        "quick question about your",
+    )
+
     def _pick_best_subject(self, generated: str, candidates: list[str], company_name: str) -> str:
-        """Prefer agency-specific subject from candidates; fall back to generated."""
-        company_tokens = {t.lower() for t in re.findall(r"[a-zA-Z]{4,}", company_name)}
+        """Prefer agency-specific, non-generic subject from candidates."""
+        company_tokens = {t.lower() for t in re.findall(r"[a-zA-Z]{3,}", company_name)}
         scored = []
         for subj in candidates:
             words = subj.split()
-            if len(words) > 5 or len(subj) <= 2 or subj.isdigit():
+            if len(words) > 10 or len(words) < 3 or len(subj) <= 2 or subj.isdigit():
                 continue
             score = 0
             lower = subj.lower()
             if any(tok in lower for tok in company_tokens):
-                score += 3
-            if "opportunity" not in lower and "exciting" not in lower:
+                score += 5
+            if any(pat in lower for pat in self._GENERIC_SUBJECT_PATTERNS):
+                score -= 4
+            if "opportunity" in lower or "exciting" in lower or "free" in lower:
+                score -= 3
+            if "?" in subj or " — " in subj or " - " in subj:
                 score += 1
             if subj.endswith("."):
                 score -= 2
@@ -277,8 +294,10 @@ class EmailGenerator:
             elif word_count > 110:
                 reasons.append(f"Too long ({word_count} words, max 110)")
 
-        if len(subject.split()) > 5:
-            reasons.append(f"Subject too long ({len(subject.split())} words, max 5)")
+        if len(subject.split()) > 10:
+            reasons.append(f"Subject too long ({len(subject.split())} words, max 10)")
+        elif len(subject.split()) < 3:
+            reasons.append(f"Subject too short ({len(subject.split())} words, min 3)")
 
         if "—" in body or " - " in body:
             reasons.append("Contains dash (banned by prompt)")
