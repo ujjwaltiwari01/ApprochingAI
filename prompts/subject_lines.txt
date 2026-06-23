@@ -48,7 +48,7 @@ INSPIRATION — adapt the intent, do NOT copy verbatim:
 - "one micro-idea for {company_name} — not a pitch"
 - "how {company_name} could ship AI faster"
 - "re {company_name}'s client onboarding stack"
-- "your {specific_service_from_analysis} workflow — quick thought"
+- "your [service from analysis] workflow — quick thought"
 
 VARY the angle across all 5 lines:
 1. Website or product-specific observation (open loop)
@@ -62,10 +62,6 @@ The best line for selection is the most specific, not the most generic.
 
 ============================================================
 OUTPUT FORMAT
-============================================================
-Output exactly 5 lines, numbered, nothing else.
-No explanation. No headers. No extra text.
-
 1. [subject line]
 2. [subject line]
 3. [subject line]

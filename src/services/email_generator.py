@@ -47,6 +47,16 @@ class EmailGenerator:
         )
         return json.dumps(data, indent=2)
 
+    def _format_prompt(self, template: str, **kwargs) -> str:
+        """Substitute known placeholders only — stray {braces} in examples won't crash."""
+        result = template
+        for key, value in kwargs.items():
+            result = result.replace(f"{{{key}}}", str(value))
+        leftover = re.findall(r"\{([a-z_][a-z0-9_]*)\}", result, re.I)
+        if leftover:
+            logger.warning(f"Prompt has unreplaced placeholders (ignored): {leftover}")
+        return result
+
     async def generate_initial_email(
         self,
         company_name: str,
@@ -56,7 +66,8 @@ class EmailGenerator:
         """Returns (subject, body, provider, validation_passed, subject_candidates)."""
         analysis_json = self._analysis_for_prompt(agency_analysis)
         greeting_instruction = recipient_greeting_instruction(recipient_first_name)
-        prompt = self._load_prompt("master_email.txt").format(
+        prompt = self._format_prompt(
+            self._load_prompt("master_email.txt"),
             portfolio_url=self.settings.sender_portfolio_url,
             linkedin_url=self.settings.sender_linkedin_url,
             sender_profile=self.sender_profile,
@@ -64,7 +75,8 @@ class EmailGenerator:
             company_name=company_name,
             recipient_greeting_instruction=greeting_instruction,
         )
-        subject_prompt = self._load_prompt("subject_lines.txt").format(
+        subject_prompt = self._format_prompt(
+            self._load_prompt("subject_lines.txt"),
             company_name=company_name,
             agency_analysis=analysis_json,
         )
@@ -128,7 +140,8 @@ class EmailGenerator:
         if followup_number >= 2 and self.settings.sender_resume_url:
             resume_line = f"- Include resume link: {self.settings.sender_resume_url}"
 
-        prompt = self._load_prompt("followup_templates.txt").format(
+        prompt = self._format_prompt(
+            self._load_prompt("followup_templates.txt"),
             company_name=company_name,
             followup_number=followup_number,
             previous_subject=previous_subject,
@@ -145,7 +158,8 @@ class EmailGenerator:
         return subject, body, provider, valid
 
     async def generate_subject_lines(self, company_name: str, agency_analysis: dict) -> list[str]:
-        prompt = self._load_prompt("subject_lines.txt").format(
+        prompt = self._format_prompt(
+            self._load_prompt("subject_lines.txt"),
             company_name=company_name,
             agency_analysis=self._analysis_for_prompt(agency_analysis),
         )
