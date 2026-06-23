@@ -3,9 +3,7 @@
 **Author:** Ujjwal Tiwari  
 **Purpose:** Automate cold outreach to ~67,000 digital agency decision-makers to land AI Engineer, Consultant, Internship, and contract roles — at scale, with real personalization, not mail-merge spam.
 
-**Live URLs (production):**
-- API: `https://outreach-api-qq0f.onrender.com`
-- Dashboard: `https://outreach-dashboard-o61f.onrender.com`
+
 - Repo: `https://github.com/ujjwaltiwari01/ApprochingAI`
 
 ---
