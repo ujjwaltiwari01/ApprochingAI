@@ -7,8 +7,9 @@ from src.core.config import get_settings
 from src.db.models import GeneratedContent, Lead, LeadStatus, async_session
 from src.services.brevo_client import BrevoClient
 from src.services.email_generator import EmailGenerator
-from src.utils.lead_row_normalizer import recipient_first_name_from_lead, recipient_greeting_instruction
+from src.services.followup_engine import FollowupEngine
 from src.services.website_analyzer import WebsiteAnalyzer
+from src.utils.lead_row_normalizer import recipient_first_name_from_lead
 
 
 class BatchProcessor:
