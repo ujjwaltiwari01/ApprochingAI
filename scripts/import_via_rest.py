@@ -95,6 +95,8 @@ def upsert_batch(table: str, records: list, *, merge: bool = False) -> None:
     url = f"{SUPABASE_URL}/rest/v1/{table}"
     if merge and table == "leads":
         url += "?on_conflict=email"
+    elif merge and table == "website_cache":
+        url += "?on_conflict=website"
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",

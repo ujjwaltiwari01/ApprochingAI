@@ -53,7 +53,6 @@ class JobRunner:
 
             if not checkpoint.get("new_done") and chunk_budget > 0 and new_sent_today < daily_new_cap:
                 remaining = min(chunk_budget, daily_new_cap - new_sent_today)
-                offset = int(checkpoint.get("new_offset", 0))
 
                 async with async_session() as session:
                     result = await session.execute(
@@ -64,7 +63,6 @@ class JobRunner:
                             Lead.hiring_probability.desc(),
                             Lead.lead_source.desc(),
                         )
-                        .offset(offset)
                         .limit(remaining)
                     )
                     new_leads = list(result.scalars().all())
@@ -74,7 +72,6 @@ class JobRunner:
                     for key, val in batch_stats.items():
                         new_stats[key] = new_stats.get(key, 0) + val
                     new_sent_today += batch_stats.get("sent", 0)
-                    checkpoint["new_offset"] = offset + len(new_leads)
                     checkpoint["new_sent_count"] = new_sent_today
                 else:
                     checkpoint["new_done"] = True
