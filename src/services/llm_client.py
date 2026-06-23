@@ -1,3 +1,22 @@
+"""Multi-provider LLM client with rate-limit resilience for zero/low API cost.
+
+Role in pipeline: shared inference layer for email generation, website
+summarization, and any other text tasks. Callers pass prompts; this module
+handles provider failover, throttling, and timeouts.
+
+Why this design (interview angle): free-tier APIs have tight RPM/TPD limits and
+frequent 429s. A single vendor would stall the daily outreach job. Ordered
+fallback (Mistral → Cerebras → OpenRouter → Gemini → Groq) trades vendor lock-in
+for uptime; class-level locks and semaphores serialize calls per provider while
+still allowing limited parallelism across providers.
+
+Key decisions:
+- Per-provider min intervals and cooldowns — proactive spacing beats reactive retry storms.
+- Mistral key pool with round-robin + per-key cooldown — multiplies free-tier quota.
+- ``asyncio.to_thread`` for sync Gemini SDK — avoids blocking the event loop without rewriting the client.
+- Regex JSON extraction in ``summarize_website`` — models often wrap JSON in prose; strict parse would fail often.
+"""
+
 import asyncio
 import re
 import time
@@ -52,6 +71,8 @@ class MistralKeyPool:
 
 
 class LLMClient:
+    """Failover LLM gateway: throttle, cooldown, and try providers until one succeeds."""
+
     DEFAULT_PROVIDERS = ["mistral", "cerebras", "openrouter", "gemini", "groq"]
 
     _provider_locks: dict[str, asyncio.Lock] = {}
@@ -69,6 +90,7 @@ class LLMClient:
             if raw
             else self.DEFAULT_PROVIDERS
         )
+        # Class-level state: one semaphore/pool per process — shared across EmailGenerator, WebsiteAnalyzer, etc.
         if LLMClient._semaphore is None:
             LLMClient._semaphore = asyncio.Semaphore(max(1, self.settings.llm_max_concurrent))
         if self.settings.mistral_api_keys:
@@ -85,8 +107,10 @@ class LLMClient:
         """Returns (response_text, provider_name). Tries providers in configured order."""
         assert LLMClient._semaphore is not None
         errors: list[str] = []
+        # Global semaphore caps total in-flight LLM work; per-provider locks enforce min gap between calls.
         async with LLMClient._semaphore:
             for provider in self.providers:
+                # Skip cooling providers entirely — faster than waiting on a provider known to 429.
                 if self._is_provider_cooling(provider):
                     errors.append(f"{provider}: cooling down")
                     continue
@@ -208,6 +232,7 @@ class LLMClient:
             base_url="https://openrouter.ai/api/v1",
         )
         messages = self._messages(system, prompt)
+        # OpenRouter: try :free model first, then paid — avoids 402 when free quota remains.
         for model in (
             "meta-llama/llama-3.3-70b-instruct:free",
             "meta-llama/llama-3.3-70b-instruct",
@@ -241,6 +266,7 @@ class LLMClient:
             )
             response.raise_for_status()
             msg = response.json()["choices"][0]["message"]
+        # Cerebras may return reasoning in a separate field — normalize to a single text payload.
             return msg.get("content") or msg.get("reasoning") or ""
 
     async def _call_mistral(self, prompt: str, system: str, max_tokens: int) -> str:
@@ -250,6 +276,7 @@ class LLMClient:
             raise RuntimeError("No Mistral API keys configured")
 
         last_exc: Exception | None = None
+        # len(keys)*2: enough rotations to skip keys in cooldown without infinite loop.
         tries = len(keys) * 2
         for _ in range(tries):
             api_key = pool.next_key() if pool else keys[0]
@@ -293,6 +320,7 @@ class LLMClient:
         return messages
 
     async def summarize_website(self, page_contents: dict[str, str]) -> dict[str, Any]:
+        # Truncate per-page input — balances context window cost vs coverage across many URLs.
         combined = "\n\n".join(
             f"=== {page} ===\n{content[:2500]}"
             for page, content in page_contents.items()

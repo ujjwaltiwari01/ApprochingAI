@@ -1,3 +1,8 @@
+"""Campaigns page — today's send volume per Brevo account.
+
+Reads daily_send_counters (populated by outreach worker) for rate-limit visibility.
+"""
+
 import sys
 from datetime import date
 from pathlib import Path
@@ -16,7 +21,7 @@ st.set_page_config(page_title="Campaigns", layout="wide")
 st.title("Campaigns")
 
 try:
-    today = date.today().isoformat()
+    today = date.today().isoformat()  # UTC date on server — aligns with counter rows
     r = httpx.get(
         f"{_url()}/rest/v1/daily_send_counters?send_date=eq.{today}",
         headers=_headers(),

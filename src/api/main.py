@@ -1,3 +1,20 @@
+"""
+API entry point (FastAPI) — HTTP gateway for the outreach system.
+
+INTERVIEW ROLE:
+  - Exposes job triggers that GitHub Actions calls every 5 minutes.
+  - Mounts Brevo webhooks for open/click/reply tracking.
+  - Protects destructive endpoints with JOB_SECRET (shared with GitHub + dashboard).
+
+WHY FastAPI + async:
+  - Workload is I/O-bound (DB, LLM HTTP, Brevo). Async avoids blocking the event loop
+    while waiting on external APIs inside each 15-lead chunk.
+
+KEY DESIGN:
+  - `_job_lock`: only one chunk runs at a time → prevents duplicate sends if cron overlaps.
+  - Each POST /jobs/daily-outreach processes ONE chunk (~15 leads) and returns quickly
+    so Render free tier does not hit the ~30s request timeout.
+"""
 import asyncio
 import uuid
 
@@ -14,8 +31,8 @@ from src.services.job_runner import JobRunner
 
 setup_logging()
 settings = get_settings()
-runner = JobRunner()
-_job_lock = asyncio.Lock()
+runner = JobRunner()  # Singleton orchestrator — reused across all HTTP requests
+_job_lock = asyncio.Lock()  # Interview: mutex for single-flight chunk processing
 
 
 def create_app() -> FastAPI:
@@ -47,6 +64,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.post("/jobs/daily-outreach")
     async def trigger_daily_outreach(_: None = Depends(verify_job_secret)):
         """Process one outreach chunk synchronously (Render free-tier safe)."""
+        # 409 if overlap — GitHub Actions concurrency queues runs; API still guards locally
         if _job_lock.locked():
             raise HTTPException(status_code=409, detail="Outreach chunk already running")
 

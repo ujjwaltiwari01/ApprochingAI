@@ -1,3 +1,21 @@
+"""
+SQLAlchemy ORM models — single source of truth for PostgreSQL schema.
+
+INTERVIEW ROLE:
+  - Maps Python types to Supabase Postgres tables used by the API (async writes).
+  - Dashboard reads same tables via Supabase REST — two access patterns, one schema.
+
+WHY SQLAlchemy 2.0 + asyncpg:
+  - API needs multi-table transactions (lead + generated_content + counters).
+  - Async matches FastAPI; avoids blocking on DB I/O during chunk processing.
+
+WHY JSONB columns (csv_raw, checkpoint, analysis_json):
+  - CSV formats differ (21K agency list vs 50K USA owners); JSONB avoids rigid migrations.
+  - Job checkpoint shape evolves without ALTER TABLE on every scheduler tweak.
+
+WHY values_callable on Enums:
+  - Postgres stores lowercase job_type values; SQLAlchemy must emit strings not enum names.
+"""
 import enum
 import uuid
 from datetime import datetime
@@ -26,6 +44,7 @@ class Base(DeclarativeBase):
 
 
 class LeadStatus(str, enum.Enum):
+    """Funnel states — interview: explain NEW → EMAIL_SENT → OPENED → REPLIED progression."""
     NEW = "NEW"
     WEBSITE_ANALYZED = "WEBSITE_ANALYZED"
     EMAIL_GENERATED = "EMAIL_GENERATED"
@@ -70,6 +89,7 @@ def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
     return [member.value for member in enum_cls]
 
 class Lead(Base):
+    """One row per contact. match_score + lead_source drive daily send priority."""
     __tablename__ = "leads"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -96,7 +116,7 @@ class Lead(Base):
     match_score: Mapped[int] = mapped_column(Integer, default=50)
     hiring_probability: Mapped[int] = mapped_column(Integer, default=0)
     lead_source: Mapped[str] = mapped_column(String(32), default="agency_list")
-    csv_raw: Mapped[dict | None] = mapped_column(JSONB)
+    csv_raw: Mapped[dict | None] = mapped_column(JSONB)  # Full CSV row — never lose import fields
     brevo_account: Mapped[int | None] = mapped_column(Integer)
     message_id: Mapped[str | None] = mapped_column(Text)
     do_not_contact: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -108,6 +128,7 @@ class Lead(Base):
 
 
 class WebsiteCache(Base):
+    """Deduped research per domain — avoids re-scraping 67k sites on every send."""
     __tablename__ = "website_cache"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -159,6 +180,7 @@ class EmailEvent(Base):
 
 
 class Job(Base):
+    """Daily outreach batch state. checkpoint JSON = resume token for GitHub Actions loop."""
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -178,6 +200,7 @@ class Job(Base):
 
 
 class DailySendCounter(Base):
+    """Per Brevo account per day — enforces 150 new + 150 follow-up free-tier caps."""
     __tablename__ = "daily_send_counters"
     __table_args__ = (UniqueConstraint("send_date", "brevo_account"),)
 
@@ -198,11 +221,11 @@ def get_engine():
     if _engine is None:
         connect_args = {}
         if "supabase" in settings.database_url:
-            connect_args["ssl"] = "require"
+            connect_args["ssl"] = "require"  # Supabase requires TLS
         _engine = create_async_engine(
             settings.database_url,
             echo=False,
-            pool_pre_ping=True,
+            pool_pre_ping=True,  # Drop stale connections after Render/Supabase idle
             connect_args=connect_args,
         )
     return _engine
@@ -216,6 +239,8 @@ def get_async_session_factory():
 
 
 class _SessionProxy:
+    """Lazy session factory — engine created on first DB use, not at import (faster cold start)."""
+
     def __call__(self, *args, **kwargs):
         return get_async_session_factory()(*args, **kwargs)
 

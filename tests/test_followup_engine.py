@@ -1,3 +1,4 @@
+"""Tests: follow-up cadence (4/5/8/15 day rules) and engagement-aware delays."""
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 

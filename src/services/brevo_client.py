@@ -1,3 +1,22 @@
+"""Brevo (Sendinblue) SMTP API client with multi-account quota rotation.
+
+Role in pipeline: final delivery step — converts plain-text bodies to HTML and
+sends via Brevo, picking an account that still has daily capacity for new or
+follow-up sends.
+
+Why this design (interview angle): free Brevo tiers cap sends per day per
+account. Sharding across multiple sender accounts multiplies throughput without
+paying for a single high-volume plan. Persisting counts in ``DailySendCounter``
+(rather than in-memory) survives process restarts and works across GitHub
+Actions runners.
+
+Key decisions:
+- Separate ``daily_new`` vs ``daily_followup`` limits — protects warm-up reputation.
+- Round-robin account index with DB-backed counters — fair distribution under load.
+- Counter increment after send (best-effort) — email delivery matters more than stats accuracy.
+- ``async_retry`` on HTTP send — transient Brevo/network errors shouldn't lose a crafted email.
+"""
+
 import asyncio
 from datetime import date
 
@@ -11,6 +30,8 @@ from src.db.models import DailySendCounter, async_session
 
 
 class BrevoClient:
+    """Sends outreach email via Brevo API with per-account daily quota enforcement."""
+
     BASE_URL = "https://api.brevo.com/v3"
 
     def __init__(self):
@@ -35,6 +56,7 @@ class BrevoClient:
         message_id = await self._send_with_account(
             account, to_email, to_name, subject, html_body, lead_id, followup_number
         )
+        # Send first, increment counter second — a failed counter write must not block delivery.
         try:
             await self._increment_counter(account["id"], is_followup)
         except Exception as exc:
@@ -58,6 +80,7 @@ class BrevoClient:
             "subject": subject,
             "htmlContent": html_body,
             "replyTo": {"email": self.settings.sender_email},
+            # Custom headers/tags tie Brevo webhooks back to lead_id + followup sequence for reply tracking.
             "tags": [f"lead_{lead_id}", f"followup_{followup_number}"],
             "headers": {"X-Mailin-custom": f"lead_id:{lead_id}|followup:{followup_number}"},
         }
@@ -84,6 +107,7 @@ class BrevoClient:
 
         n = len(accounts)
         async with async_session() as session:
+            # Rotate start index each success — spreads load instead of always draining account 0 first.
             for step in range(n):
                 account = accounts[(self._account_index + step) % n]
                 result = await session.execute(
@@ -93,6 +117,7 @@ class BrevoClient:
                     )
                 )
                 counter = result.scalar_one_or_none()
+                # New vs follow-up share accounts but different caps — follow-ups often have a higher allowance.
                 limit = account["daily_followup"] if is_followup else account["daily_new"]
                 current = 0
                 if counter:
@@ -114,6 +139,7 @@ class BrevoClient:
                 )
             )
             counter = result.scalar_one_or_none()
+            # Upsert pattern: one counter row per (date, account) — simple reads on the hot path.
             if not counter:
                 counter = DailySendCounter(send_date=today, brevo_account=account_id)
                 session.add(counter)
@@ -125,6 +151,7 @@ class BrevoClient:
             await session.commit()
 
     def text_to_html(self, text: str) -> str:
+        # Double-newline → paragraph; single newlines → <br> — preserves LLM line breaks without a template engine.
         paragraphs = text.strip().split("\n\n")
         html_parts = []
         for p in paragraphs:

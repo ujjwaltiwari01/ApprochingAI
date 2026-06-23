@@ -1,3 +1,19 @@
+"""
+Per-lead pipeline: analyze → generate → validate → send → persist.
+
+INTERVIEW ROLE:
+  - Called by JobRunner for each lead in a chunk.
+  - Encodes the core business loop recruiters would do manually.
+
+PIPELINE ORDER (why this sequence):
+  1. WebsiteAnalyzer — gather context before LLM (garbage in = generic email out).
+  2. EmailGenerator — LLM + validation gate (quality control before reputation risk).
+  3. BrevoClient — send only if validation passed (unless ALLOW_INVALID_SEND=true).
+  4. DB update — audit trail in generated_content + lead status funnel.
+
+CRITICAL BUG FIX PATTERN:
+  - Brevo send success does NOT roll back if DB update fails (email already delivered).
+"""
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -13,6 +29,8 @@ from src.utils.lead_row_normalizer import recipient_first_name_from_lead
 
 
 class BatchProcessor:
+    """Stateless service object — safe to instantiate once per JobRunner."""
+
     def __init__(self):
         self.settings = get_settings()
         self.analyzer = WebsiteAnalyzer()
@@ -36,6 +54,7 @@ class BatchProcessor:
                 )
                 stats["generated"] += 1
 
+                # Validation gate — interview: prevents LLM slop from hurting domain reputation
                 if not valid and not self.settings.allow_invalid_send:
                     logger.warning(f"Skipping send for {lead.id} — validation failed")
                     stats["skipped_validation"] += 1
@@ -144,9 +163,10 @@ class BatchProcessor:
             followup_number=followup_number,
             is_followup=is_followup,
         )
-        stats["sent"] += 1
+        stats["sent"] += 1  # Count send after Brevo accepts — source of truth is Brevo API
 
         try:
+            # Separate try: DB failure after deliver must not re-raise (no double-send on retry)
             async with async_session() as session:
                 result = await session.execute(select(Lead).where(Lead.id == lead.id))
                 db_lead = result.scalar_one_or_none()

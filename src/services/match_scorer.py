@@ -1,3 +1,21 @@
+"""Deterministic lead scoring before website scrape and email generation.
+
+Role in pipeline: first quality filter at CSV import — assigns ``match_score``,
+``hiring_probability``, and agency category so downstream jobs prioritize AI/
+automation agencies and USA owner/decision-maker rows.
+
+Why this design (interview angle): LLM scoring every row would be slow and
+expensive on 50k+ leads. Keyword buckets give explainable scores ("why 95 vs
+50?") that interviewers can reason about. USA-owner boosts are layered on top
+because that CSV encodes richer title/email signals worth prioritizing.
+
+Key decisions:
+- Priority-ordered category classification — first match wins (AI > automation > web…).
+- Separate hiring probability — hiring signals can lift priority without recategorizing.
+- Caps at 100 on all boosts — prevents runaway scores from stacked bonuses.
+- Pure functions, no DB — easy to unit test and call from import + preview scripts.
+"""
+
 from src.utils.lead_row_normalizer import (
     LEAD_SOURCE_USA_OWNERS,
     is_direct_decision_maker_email,
@@ -64,6 +82,7 @@ def _text_contains(text: str, keywords: list[str]) -> bool:
 def classify_agency(services: str = "", description: str = "", expertise: str = "", industries: str = "") -> tuple[str, int]:
     combined = f"{services} {description} {expertise} {industries}".lower()
 
+    # Ordered checks: higher-value agency types must win when multiple keyword sets match.
     if _text_contains(combined, AI_KEYWORDS):
         return "ai_agency", CATEGORY_SCORES["ai_agency"]
     if _text_contains(combined, AUTOMATION_KEYWORDS):
@@ -74,6 +93,7 @@ def classify_agency(services: str = "", description: str = "", expertise: str = 
         return "marketing", CATEGORY_SCORES["marketing"]
     if _text_contains(combined, CONSULTING_KEYWORDS):
         return "consulting", CATEGORY_SCORES["consulting"]
+    # Sparse text → unrelated — avoids inflating scores for empty CSV cells.
     if len(combined.strip()) > 50:
         return "general_business", CATEGORY_SCORES["general_business"]
     return "unrelated", CATEGORY_SCORES["unrelated"]
@@ -82,6 +102,7 @@ def classify_agency(services: str = "", description: str = "", expertise: str = 
 def compute_hiring_probability(description: str = "", team_bios: str = "", services: str = "") -> int:
     combined = f"{description} {team_bios} {services}".lower()
     score = 0
+    # Hiring signals are additive caps — mirrors "might be hiring soon" without requiring a careers page scrape.
     if _text_contains(combined, HIRING_SIGNALS):
         score += 40
     if _text_contains(combined, AI_KEYWORDS):
@@ -97,6 +118,7 @@ def _apply_usa_owner_boosts(match_score: int, hiring_prob: int, scoring: dict) -
     if scoring.get("lead_source") != LEAD_SOURCE_USA_OWNERS:
         return match_score, hiring_prob
 
+    # USA owners list is a curated segment — flat boost reflects higher expected reply rate.
     match_score = min(match_score + USA_OWNER_SOURCE_BOOST, 100)
 
     role_text = f"{scoring.get('title', '')} {scoring.get('seniority', '')} {scoring.get('expertise', '')}".lower()
@@ -124,6 +146,7 @@ def score_lead(row: dict) -> tuple[int, int, str]:
         team_bios=scoring.get("team_bios", ""),
         services=scoring.get("services", ""),
     )
+    # Cross-signal bump: strong hiring prob nudges match_score — aligns send order with likely receptivity.
     if hiring_prob >= 40:
         match_score = min(match_score + 5, 100)
 

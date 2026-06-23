@@ -1,3 +1,8 @@
+"""Failures page — recent failed/paused outreach jobs from jobs table.
+
+Useful when GitHub Actions or Render cron reports errors; shows raw job JSON for debugging.
+"""
+
 import sys
 from pathlib import Path
 
@@ -14,6 +19,7 @@ st.set_page_config(page_title="Failures", layout="wide")
 st.title("Failures & Job Logs")
 
 try:
+    # PostgREST `in.(...)` filter for non-success job statuses
     r = httpx.get(
         f"{_url()}/rest/v1/jobs?status=in.(failed,running,paused)&order=started_at.desc&limit=50",
         headers=_headers(),

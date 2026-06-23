@@ -1,3 +1,21 @@
+"""Website scraping, caching, and LLM summarization for agency personalization.
+
+Role in pipeline: enriches each lead before email generation — produces
+``agency_analysis`` JSON (industry, services, summary) from live pages or CSV
+fallback, stored in ``WebsiteCache`` for reuse across leads sharing a domain.
+
+Why this design (interview angle): Playwright is heavy (RAM, flaky sites, slow).
+Cache-first with TTL amortizes scrape cost; CSV fallback keeps the pipeline
+moving when ``skip_playwright`` is set on server follow-ups. Semaphore limits
+concurrent browsers so we don't OOM the GitHub Actions runner.
+
+Key decisions:
+- Multi-path probe (/, /about, /services…) — many agencies bury positioning off homepage.
+- BeautifulSoup strip of nav/footer — less noise for the summarization LLM.
+- ``get_cached_analysis`` for follow-ups — no fresh scrape on scheduled re-touch.
+- 3 scrape retries then CSV fallback — fail soft per lead, not fail whole batch.
+"""
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 
@@ -20,6 +38,8 @@ PAGE_KEYS = {
 
 
 class WebsiteAnalyzer:
+    """Fetches or loads agency context: DB cache → Playwright scrape → CSV fallback."""
+
     def __init__(self):
         self.settings = get_settings()
         self.llm = LLMClient()
@@ -30,6 +50,7 @@ class WebsiteAnalyzer:
         if not website:
             return self._fallback_from_csv(lead)
 
+        # Cache hit avoids Playwright entirely — biggest latency and cost win in the pipeline.
         cached = await self._get_cache(website)
         if cached:
             return cached
@@ -38,6 +59,7 @@ class WebsiteAnalyzer:
             logger.info(f"Playwright skipped for {website}, using CSV fallback")
             return self._fallback_from_csv(lead)
 
+        # Semaphore bounds concurrent Chromium instances — Playwright is the main memory bottleneck.
         async with self.semaphore:
             return await self._scrape_and_cache(website, lead)
 
@@ -63,6 +85,7 @@ class WebsiteAnalyzer:
             )
             cache = result.scalar_one_or_none()
             if cache and cache.last_scraped.replace(tzinfo=timezone.utc) > cutoff:
+                # Prefer structured analysis_json; synthesize from legacy columns for older cache rows.
                 logger.info(f"Cache hit for {website}")
                 return cache.analysis_json or {
                     "industry": cache.industry,
@@ -121,12 +144,14 @@ class WebsiteAnalyzer:
             for path in PAGES:
                 url = base_url if path == "/" else f"{base_url.rstrip('/')}{path}"
                 try:
+                    # domcontentloaded vs networkidle — faster; many agency sites never finish all assets.
                     response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
                     if response and response.status < 400:
                         html = await page.content()
                         text = self._extract_text(html)
                         if text:
                             key = PAGE_KEYS.get(path, "homepage_content")
+                            # Homepage always wins for shared keys; later paths only fill empty slots.
                             if key not in contents or path == "/":
                                 contents[key] = text
                 except Exception:
@@ -138,6 +163,7 @@ class WebsiteAnalyzer:
 
     def _extract_text(self, html: str) -> str:
         soup = BeautifulSoup(html, "lxml")
+        # Remove chrome elements — nav/footer repeat on every page and dilute the LLM summary.
         for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
         text = soup.get_text(separator=" ", strip=True)

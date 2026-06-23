@@ -1,4 +1,8 @@
-"""Database helpers for Streamlit via Supabase REST API."""
+"""Database helpers for Streamlit via Supabase REST API.
+
+No SQLAlchemy here — all reads use PostgREST (httpx) so the dashboard works with
+only SUPABASE_URL + anon/service key, same as import_via_rest.py and preview_emails.py.
+"""
 
 import os
 from functools import lru_cache
@@ -32,6 +36,7 @@ def _headers(extra: dict | None = None) -> dict:
 
 
 def _count(table: str, filters: str = "") -> int:
+    # HEAD + Prefer: count=exact avoids fetching rows — cheap aggregate for metrics
     url = f"{_url()}/rest/v1/{table}?select=id"
     if filters:
         url += f"&{filters}"
@@ -48,6 +53,7 @@ def test_connection() -> dict:
 
 
 def get_dashboard_metrics() -> dict:
+    """Funnel counts for the home dashboard — each metric is a filtered _count()."""
     total = _count("leads")
     sent = _count("leads", "sent_at=not.is.null")
     generated = _count("leads", "status=eq.EMAIL_GENERATED")
@@ -71,6 +77,7 @@ def get_dashboard_metrics() -> dict:
 
 
 LEAD_STATUSES = [
+    # Mirrors leads.status enum in Supabase — used by Leads page filter dropdown
     "NEW",
     "WEBSITE_ANALYZED",
     "EMAIL_GENERATED",
@@ -94,6 +101,7 @@ def fetch_leads(
     lead_source: str | None = None,
     limit: int = 100,
 ) -> list[dict]:
+    """Paginated lead list for the Leads page — ordered by outreach priority."""
     params = [
         f"match_score=gte.{score_min}",
         "order=match_score.desc,hiring_probability.desc,lead_source.desc",

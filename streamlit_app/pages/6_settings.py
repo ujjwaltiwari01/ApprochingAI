@@ -1,3 +1,8 @@
+"""Settings page — env visibility, capacity docs, manual job trigger, webhook URLs.
+
+Does not edit secrets; shows which vars are set and can POST to Render outreach API.
+"""
+
 import os
 import sys
 from pathlib import Path
@@ -21,6 +26,7 @@ except Exception as exc:
     st.error(f"Connection failed: {exc}")
 
 st.subheader("Environment")
+# Boolean only — never render secret values in the UI
 st.code(f"DATABASE_URL: {'set' if os.getenv('DATABASE_URL') else 'NOT SET'}")
 st.code(f"SUPABASE_URL: {os.getenv('SUPABASE_URL', 'NOT SET')}")
 st.code(f"MISTRAL_API_KEY: {'set' if os.getenv('MISTRAL_API_KEY') else 'NOT SET'}")
@@ -59,7 +65,7 @@ if render_url and job_secret:
         base = render_url.rstrip("/")
         with st.spinner("Waking API and processing chunk — please wait (up to 8 min)..."):
             try:
-                httpx.get(f"{base}/health", timeout=120)
+                httpx.get(f"{base}/health", timeout=120)  # Cold-start wake on free tier
                 response = httpx.post(
                     f"{base}/jobs/daily-outreach",
                     headers={"Authorization": f"Bearer {job_secret}"},
@@ -81,6 +87,7 @@ else:
 st.subheader("Webhook URLs")
 base = render_url or "https://your-app.onrender.com"
 secret = os.getenv("WEBHOOK_SECRET", "")
+# Brevo transactional + inbound reply webhooks (configure in Brevo dashboard)
 suffix = f"?secret={secret}" if secret and secret != "change-me-to-random-secret" else ""
 st.code(f"Transactional: {base}/webhooks/brevo/transactional{suffix}")
 st.code(f"Inbound replies: {base}/webhooks/brevo/inbound{suffix}")

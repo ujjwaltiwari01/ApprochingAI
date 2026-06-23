@@ -1,3 +1,10 @@
+"""Application settings loaded from environment variables and .env.
+
+Design: Pydantic Settings gives typed, validated config with a single source of
+truth. Callers use get_settings() (cached singleton) so env is parsed once per
+process — important for serverless/cron jobs where cold starts are frequent.
+"""
+
 from functools import lru_cache
 import os
 import re
@@ -7,6 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # extra="ignore" lets .env carry unrelated keys without breaking startup.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = Field(default="postgresql+asyncpg://localhost/test", alias="DATABASE_URL")
@@ -14,12 +22,16 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value: object) -> object:
+        """Coerce DATABASE_URL into the async driver form SQLAlchemy expects."""
         if not isinstance(value, str):
             return value
+        # Strip quotes — common when secrets are pasted from hosted dashboards.
         url = value.strip().strip('"').strip("'")
+        # Supabase/docs often ship postgresql://; we need +asyncpg for async engine.
         if url.startswith("postgresql://") and "+asyncpg" not in url:
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+        # Optional rewrite: direct db.*.supabase.co → pooler host for connection limits.
         pooler_host = os.getenv("SUPABASE_POOLER_HOST", "").strip()
         if pooler_host:
             match = re.search(
@@ -41,6 +53,7 @@ class Settings(BaseSettings):
     webhook_secret: str = Field(default="", alias="WEBHOOK_SECRET")
     job_secret: str = Field(default="", alias="JOB_SECRET")
 
+    # Three Brevo accounts spread daily send quotas across inboxes/API keys.
     brevo_api_key_1: str = Field(default="", alias="BREVO_API_KEY_1")
     brevo_sender_email_1: str = Field(default="", alias="BREVO_SENDER_EMAIL_1")
     brevo_sender_name_1: str = Field(default="Ujjwal Tiwari", alias="BREVO_SENDER_NAME_1")
@@ -70,6 +83,7 @@ class Settings(BaseSettings):
     daily_new_per_account: int = Field(default=150, alias="DAILY_NEW_PER_ACCOUNT")
     daily_followup_per_account: int = Field(default=150, alias="DAILY_FOLLOWUP_PER_ACCOUNT")
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
+    # Comma-ordered fallback chain when a provider rate-limits or errors out.
     llm_providers: str = Field(
         default="mistral,cerebras,openrouter,gemini,groq",
         alias="LLM_PROVIDERS",
@@ -87,6 +101,7 @@ class Settings(BaseSettings):
 
     @property
     def brevo_accounts(self) -> list[dict]:
+        """Flatten numbered env vars into a list the sender layer can iterate."""
         accounts = []
         for i in range(1, 4):
             accounts.append(
@@ -103,6 +118,7 @@ class Settings(BaseSettings):
 
     @property
     def mistral_api_keys(self) -> list[str]:
+        """Support a secondary Mistral key for round-robin / failover."""
         keys = []
         for key in (self.mistral_api_key, self.mistral_api_key_2):
             if key and key.strip():
@@ -112,4 +128,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Process-wide settings singleton; safe to call from any module."""
     return Settings()

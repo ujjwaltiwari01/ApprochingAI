@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Import agency CSV into Supabase leads table."""
+"""Import agency CSV into Supabase leads table.
+
+Async path using DATABASE_URL (asyncpg/SQLAlchemy) via src.services.csv_importer.
+Prefer import_via_rest.py when you lack direct Postgres credentials; use this when
+the full DB connection string is available (faster bulk inserts).
+"""
 
 import asyncio
 import sys
@@ -14,6 +19,7 @@ setup_logging()
 
 
 async def main():
+    # Default dataset; override with: python scripts/import_csv.py path/to/file.csv
     csv_path = Path(__file__).parent.parent / "21000+ Agency Contact Details - 21K Digital Agencies Contact List.csv"
     if len(sys.argv) > 1:
         csv_path = Path(sys.argv[1])
@@ -22,6 +28,7 @@ async def main():
     stats = await import_csv(csv_path)
     print(f"Import stats: {stats}")
 
+    # Pre-populate website_cache so outreach can personalize without scraping every site
     print("Seeding website cache from CSV...")
     seeded = await seed_website_cache_from_csv(csv_path)
     print(f"Seeded {seeded} cache entries")

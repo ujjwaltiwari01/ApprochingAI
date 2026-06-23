@@ -1,3 +1,10 @@
+# Render Blueprint — two services from one repo (split API vs dashboard deploy cycles)
+#
+# outreach-api: Docker image, Playwright-capable, JOB_SECRET, DATABASE_URL, Brevo keys
+# outreach-dashboard: lightweight Streamlit, Supabase REST only (no async DB driver)
+#
+# SKIP_PLAYWRIGHT=true on API: free tier can't run headless browser reliably at scale;
+# we use website_cache + CSV-seeded analysis instead.
 services:
   - type: web
     name: outreach-api

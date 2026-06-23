@@ -1,5 +1,6 @@
 """Ensure prompt templates format without KeyError."""
 
+"""Tests: prompt templates must format without KeyError — guards against {brace} bugs in prompts."""
 from pathlib import Path
 
 from src.services.email_generator import EmailGenerator

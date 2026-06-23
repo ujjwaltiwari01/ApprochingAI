@@ -1,6 +1,13 @@
+"""One-off script: write sender_profile.json for email personalization.
+
+Run manually when updating Ujjwal's bio/skills; EmailGenerator reads
+config/sender_profile.json when drafting outreach. Not part of daily cron.
+"""
+
 import json
 from pathlib import Path
 
+# Static sender persona — injected into LLM prompts as "who is reaching out"
 PROFILE = {
     "name": "Ujjwal Tiwari",
     "title": "AI Engineer",
@@ -25,5 +32,6 @@ PROFILE = {
 }
 
 output = Path(__file__).parent.parent / "config" / "sender_profile.json"
+# Consumed by EmailGenerator when building the "about the sender" section of prompts
 output.write_text(json.dumps(PROFILE, indent=2), encoding="utf-8")
 print(f"Written to {output}")

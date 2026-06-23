@@ -1,3 +1,8 @@
+"""Analytics page — database scale and cache coverage.
+
+Cache coverage ≈ website_cache rows / leads — higher means more sites have pre-scraped context.
+"""
+
 import sys
 from pathlib import Path
 
@@ -20,7 +25,7 @@ try:
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Leads", f"{total_leads:,}")
     col2.metric("Cache Entries", f"{cache_count:,}")
-    cache_hit_rate = (cache_count / total_leads * 100) if total_leads else 0
+    cache_hit_rate = (cache_count / total_leads * 100) if total_leads else 0  # Rough coverage proxy
     col3.metric("Cache Coverage", f"{cache_hit_rate:.1f}%")
 
     st.subheader("Lead Status")

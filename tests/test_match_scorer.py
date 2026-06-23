@@ -1,3 +1,4 @@
+"""Tests: keyword-based lead scoring — fast O(1) per row vs LLM at import time on 67k leads."""
 from src.services.match_scorer import classify_agency, compute_hiring_probability, score_lead
 
 

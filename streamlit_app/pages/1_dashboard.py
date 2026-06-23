@@ -1,3 +1,8 @@
+"""Dashboard page — outreach funnel KPIs and pipeline bar chart.
+
+Streamlit auto-discovers this as sidebar page "Dashboard" (filename prefix 1_).
+"""
+
 import sys
 from pathlib import Path
 
@@ -27,6 +32,7 @@ col4.metric("Replies", f"{m['replied']:,}")
 
 col5, col6, col7, col8 = st.columns(4)
 col5.metric("Interviews", m["interviews"])
+# Rates denominator is sent_at (actual sends), not EMAIL_GENERATED status
 open_rate = (m["opened"] / m["sent"] * 100) if m["sent"] else 0
 click_rate = (m["clicked"] / m["sent"] * 100) if m["sent"] else 0
 reply_rate = (m["replied"] / m["sent"] * 100) if m["sent"] else 0

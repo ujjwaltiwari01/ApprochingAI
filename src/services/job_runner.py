@@ -1,3 +1,17 @@
+"""
+Daily job orchestrator — coordinates one CHUNK of outreach per API call.
+
+INTERVIEW ROLE:
+  - Brain of the scheduler loop: follow-ups first, then new leads, then save checkpoint.
+  - Makes the pipeline resumable across GitHub Actions iterations and server restarts.
+
+WHY checkpoint JSON in `jobs` table (not Redis):
+  - Free-tier stack: Postgres already exists, durable, no extra infra.
+  - Stores followups_sent_count, new_sent_count, *_done flags between chunks.
+
+WHY follow-ups before new leads:
+  - Warm contacts convert better; don't waste quota on cold mail while follow-ups age out.
+"""
 import uuid
 from datetime import datetime, timezone
 
@@ -11,6 +25,8 @@ from src.services.followup_engine import FollowupEngine
 
 
 class JobRunner:
+    """One chunk = up to JOB_CHUNK_SIZE leads, split between follow-ups and new outreach."""
+
     def __init__(self):
         self.settings = get_settings()
         self.processor = BatchProcessor()
@@ -25,13 +41,13 @@ class JobRunner:
         checkpoint = dict(job.checkpoint or {})
         followup_stats = dict(checkpoint.get("followup_stats", {}))
         new_stats = dict(checkpoint.get("new_stats", {}))
-        chunk = self.settings.job_chunk_size
-        chunk_budget = chunk
+        chunk = self.settings.job_chunk_size  # Default 15 — tuned for Render timeout + LLM latency
+        chunk_budget = chunk  # Shared budget: follow-ups consume first, remainder goes to new
 
         try:
             await self._update_job(job.id, JobStatus.RUNNING, started_at=job.started_at or datetime.now(timezone.utc))
 
-            daily_fu_cap = self.settings.daily_followup_per_account * 3
+            daily_fu_cap = self.settings.daily_followup_per_account * 3  # 150 × 3 Brevo accounts
             fu_sent_today = int(checkpoint.get("followups_sent_count", 0))
 
             if not checkpoint.get("followups_done") and chunk_budget > 0 and fu_sent_today < daily_fu_cap:
@@ -58,10 +74,11 @@ class JobRunner:
                     result = await session.execute(
                         select(Lead)
                         .where(Lead.status == LeadStatus.NEW, Lead.do_not_contact.is_(False))
+                        # No OFFSET — processed leads leave NEW status; always top scorers next
                         .order_by(
                             Lead.match_score.desc(),
                             Lead.hiring_probability.desc(),
-                            Lead.lead_source.desc(),
+                            Lead.lead_source.desc(),  # usa_owners > agency_list on ties
                         )
                         .limit(remaining)
                     )

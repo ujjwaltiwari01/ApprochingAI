@@ -1,3 +1,19 @@
+"""
+Brevo webhook handlers — close the loop on opens, clicks, bounces, and replies.
+
+INTERVIEW ROLE:
+  - Without webhooks, outreach is fire-and-forget. Webhooks drive follow-up timing
+    and funnel metrics (OPENED → CLICKED → REPLIED).
+
+WHY embed lead_id in X-Mailin-custom header (set in brevo_client):
+  - Brevo payloads don't always include our internal UUID; custom header is reliable.
+
+WHY EVENT_PRIORITY:
+  - Webhooks can arrive out of order. Don't downgrade CLICKED → DELIVERED.
+
+WHY brevo_event_id unique index:
+  - Brevo may retry webhooks; idempotent insert prevents duplicate funnel inflation.
+"""
 import uuid
 
 from datetime import datetime, timezone
@@ -13,6 +29,7 @@ router = APIRouter(prefix="/webhooks/brevo", tags=["webhooks"])
 settings = get_settings()
 
 EVENT_PRIORITY = {
+    # Higher number wins when multiple events compete for lead.status
     "replied": 5,
     "click": 4,
     "clicked": 4,
@@ -95,7 +112,7 @@ async def handle_transactional_webhook(request: Request):
             select(EmailEvent).where(EmailEvent.brevo_event_id == brevo_event_id)
         )
         if existing.scalar_one_or_none():
-            return {"status": "duplicate"}
+            return {"status": "duplicate"}  # Idempotent — safe for Brevo retries
 
         lead = None
         if lead_id_str:

@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate email previews for real leads — no sending."""
+"""Generate email previews for real leads — no sending.
+
+CLI and library entry point for safe copy review before live outreach.
+Pipeline: fetch NEW leads from Supabase → merge agency analysis (CSV + website_cache)
+→ EmailGenerator (LLM) → validate → write markdown under previews/.
+
+Used by: `python scripts/preview_emails.py` and streamlit pages/7_preview_emails.py.
+"""
 
 import argparse
 import asyncio
@@ -17,7 +24,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from src.core.config import get_settings
 
-get_settings.cache_clear()
+get_settings.cache_clear()  # Fresh .env when run as a script (not cached from prior imports)
 
 from src.services.email_generator import EmailGenerator
 from src.utils.lead_row_normalizer import recipient_first_name_from_lead
@@ -30,6 +37,7 @@ from src.utils.agency_analysis import (
 
 
 def _supabase_headers() -> dict:
+    # PostgREST auth: service role preferred for unrestricted reads in ops scripts
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
     return {
         "apikey": key,
@@ -39,6 +47,7 @@ def _supabase_headers() -> dict:
 
 
 def fetch_top_leads(limit: int, min_score: int) -> list[dict]:
+    # Highest match_score first — same ordering logic the daily sender uses
     url = (
         f"{os.getenv('SUPABASE_URL').rstrip('/')}/rest/v1/leads"
         f"?status=eq.NEW&match_score=gte.{min_score}"
@@ -73,6 +82,7 @@ def analysis_from_csv(csv_raw: dict | None, hiring_prob: int) -> dict:
 
 
 def get_agency_analysis(lead: dict) -> dict:
+    # Layer CSV row data with scraped/cached website analysis when available
     csv_analysis = agency_analysis_from_csv_raw(
         lead.get("csv_raw"), lead.get("hiring_probability", 0)
     )
@@ -136,6 +146,7 @@ def format_preview_block(
 
 
 async def generate_previews(count: int, min_score: int, include_followup: bool) -> Path:
+    """Core preview loop; returns path to the generated markdown file."""
 
     leads = fetch_top_leads(count, min_score)
     if not leads:
@@ -167,12 +178,13 @@ async def generate_previews(count: int, min_score: int, include_followup: bool) 
         print(f"[{i}/{len(leads)}] {company} ({lead.get('email')})...")
 
         analysis = get_agency_analysis(lead)
+        # generate_initial_email picks subject from candidates and runs validation internally
         subject, body, provider, valid, subject_candidates = await generator.generate_initial_email(
             company,
             analysis,
             recipient_first_name=recipient_first_name_from_lead(lead),
         )
-        validation = generator.validate_email_details(subject, body, analysis)
+        validation = generator.validate_email_details(subject, body, analysis)  # Word count, banned phrases, etc.
 
         sections.append(
             format_preview_block(lead, subject, body, provider, validation, analysis, subject_candidates)

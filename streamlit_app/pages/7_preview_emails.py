@@ -1,3 +1,9 @@
+"""Email Preview page — UI wrapper around scripts.preview_emails.generate_previews.
+
+Same LLM pipeline as CLI preview; writes markdown locally and renders it in-browser.
+No Brevo send — safe for prompt tuning before production.
+"""
+
 import os
 import sys
 from pathlib import Path
@@ -25,9 +31,10 @@ if st.button("Generate previews", type="primary"):
         try:
             from src.core.config import get_settings
 
-            get_settings.cache_clear()
+            get_settings.cache_clear()  # Pick up Render env vars on each button click
             s = get_settings()
             missing = [
+                # Warn early if primary LLM keys missing on dashboard host
                 name
                 for name, val in (
                     ("MISTRAL_API_KEY", s.mistral_api_key),
@@ -45,7 +52,7 @@ if st.button("Generate previews", type="primary"):
 
             from scripts.preview_emails import generate_previews
 
-            out_path = __import__("asyncio").run(
+            out_path = __import__("asyncio").run(  # Streamlit is sync; preview core is async
                 generate_previews(count, min_score, include_followup)
             )
             content = out_path.read_text(encoding="utf-8")

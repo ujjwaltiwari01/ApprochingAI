@@ -1,3 +1,24 @@
+"""Personalized cold-email generation with deterministic quality gates.
+
+Role in pipeline: sits after website analysis and before Brevo send — turns
+``agency_analysis`` JSON plus prompt templates into subject + body text that
+passes length, tone, and personalization checks.
+
+Why this design (interview angle): LLMs are great at tone but unreliable on
+constraints (word count, banned phrases, required links). We split generation
+into parallel body + subject calls for latency, then enforce rules in Python
+rather than trusting the model. Retry loops feed validation failures back as
+prompt context — cheaper than a second orchestration service and keeps quality
+logic testable without API calls.
+
+Key decisions:
+- Manual ``{placeholder}`` substitution instead of ``str.format`` so example
+  braces in prompt files cannot crash rendering.
+- Heuristic subject picker over blind LLM choice — reduces generic/spammy lines.
+- Separate validation for initial vs follow-up word counts.
+- Buzzword/spam lists as code constants for fast iteration without redeploying prompts.
+"""
+
 import asyncio
 import json
 import re
@@ -24,6 +45,8 @@ SPAM_WORDS = ["free", "guarantee", "act now", "limited time", "click here", "buy
 
 
 class EmailGenerator:
+    """Orchestrates LLM calls, parsing, subject selection, and validation for outreach copy."""
+
     def __init__(self):
         self.settings = get_settings()
         self.llm = LLMClient(self.settings)
@@ -87,6 +110,7 @@ class EmailGenerator:
             "The email body must be 75 to 110 words before the Portfolio and LinkedIn lines."
         )
 
+        # Parallel LLM calls: body and subject are independent — saves ~1 round-trip vs sequential.
         (text, provider), (subject_text, _) = await asyncio.gather(
             self.llm.generate(prompt, system=email_system, max_tokens=600, task="initial_email"),
             self.llm.generate(subject_prompt, max_tokens=300, task="subject_lines"),
@@ -101,6 +125,7 @@ class EmailGenerator:
         valid = self._validate_email(subject, body, agency_analysis)
         attempts = 0
         max_retries = self.settings.llm_email_max_retries
+        # Validation-driven retry: append failure reasons to the same prompt instead of a separate repair step.
         while not valid and attempts < max_retries:
             attempts += 1
             details = self.validate_email_details(subject, body, agency_analysis)
@@ -192,6 +217,7 @@ class EmailGenerator:
     def _pick_best_subject(self, generated: str, candidates: list[str], company_name: str) -> str:
         """Prefer agency-specific, non-generic subject from candidates."""
         company_tokens = {t.lower() for t in re.findall(r"[a-zA-Z]{3,}", company_name)}
+        # Lightweight scoring beats a second LLM call — predictable, free, and unit-testable.
         scored = []
         for subj in candidates:
             words = subj.split()
@@ -233,6 +259,7 @@ class EmailGenerator:
                 body_lines.append(line)
 
         body = "\n".join(body_lines).strip()
+        # Models sometimes omit "Email:" label — treat full output as body to avoid empty sends.
         if not body and not body_started:
             body = text.strip()
 
@@ -296,6 +323,7 @@ class EmailGenerator:
         if not body:
             reasons.append("Missing body")
 
+        # Word count excludes sign-off and link lines — matches prompt "75–110 words before Portfolio/LinkedIn".
         word_count = len(" ".join(self._body_content_lines(body)).split())
 
         if is_followup:
@@ -351,6 +379,7 @@ class EmailGenerator:
                 for svc in services:
                     tokens.update(w.lower() for w in str(svc).split() if len(w) > 4)
             body_lower = " ".join(self._body_content_lines(body)).lower()
+            # Token overlap check is a cheap proxy for "mentioned something from their site" — not semantic similarity.
             if tokens and not any(tok in body_lower for tok in list(tokens)[:20]):
                 reasons.append("No website-specific insight detected")
 

@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Import agency CSV into Supabase via REST API (no DATABASE_URL password needed)."""
+"""Import agency CSV into Supabase via REST API (no DATABASE_URL password needed).
+
+Alternative to import_csv.py when you only have Supabase URL + anon/service key.
+Normalizes rows, scores leads (match_scorer), batches POST to PostgREST, and
+optionally seeds website_cache so LLM prompts have agency context without scraping.
+
+USA 50K file uses merge-duplicates on email; default 21K file ignores duplicates.
+"""
 
 import json
 import os
@@ -20,13 +27,14 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-BATCH_SIZE = 500
+BATCH_SIZE = 500  # PostgREST payload limit — balance throughput vs. timeout risk
 
 DEFAULT_CSV = Path(__file__).parent.parent / "21000+ Agency Contact Details - 21K Digital Agencies Contact List.csv"
 USA_CSV = Path(__file__).parent.parent / "USA data 50K (1) - Agency Owners 50K (1).csv"
 
 
 def row_to_record(row: dict, *, for_merge: bool = False) -> dict | None:
+    """Map one CSV row to a leads table record; returns None if email invalid."""
     fields = normalize_lead_fields(row)
     email = normalize_email(row.get(fields["email_key"]))
     if not email or not is_valid_email(email):
@@ -34,7 +42,7 @@ def row_to_record(row: dict, *, for_merge: bool = False) -> dict | None:
 
     match_score, hiring_prob, _ = score_lead(row)
     website = normalize_website(row.get(fields["website_key"]))
-    csv_raw = {k: (v if pd.notna(v) else None) for k, v in row.items()}
+    csv_raw = {k: (v if pd.notna(v) else None) for k, v in row.items()}  # Preserved for later LLM context
 
     record = {
         "name": fields["name"],
@@ -53,6 +61,7 @@ def row_to_record(row: dict, *, for_merge: bool = False) -> dict | None:
 
 
 def cache_row_to_record(row: dict) -> dict | None:
+    """Build website_cache row from CSV description/services — skips live scraping."""
     from src.utils.lead_row_normalizer import scoring_fields_from_row
 
     fields = normalize_lead_fields(row)
@@ -90,6 +99,7 @@ def cache_row_to_record(row: dict) -> dict | None:
 
 
 def upsert_batch(table: str, records: list, *, merge: bool = False) -> None:
+    """POST a batch; Prefer header controls duplicate handling (ignore vs merge)."""
     import httpx
 
     url = f"{SUPABASE_URL}/rest/v1/{table}"
@@ -115,7 +125,7 @@ def import_leads(csv_path: Path, *, merge_duplicates: bool = False) -> dict:
     print(f"Importing leads from {csv_path.name}...")
     lead_stats = {"total": 0, "imported": 0, "skipped": 0, "errors": 0}
     batch: list = []
-    seen_emails: set = set()
+    seen_emails: set = set()  # In-file dedup before hitting DB unique constraint on email
 
     for chunk in pd.read_csv(csv_path, chunksize=2000, dtype=str, keep_default_na=False):
         for _, row in chunk.iterrows():
@@ -202,6 +212,7 @@ def main():
     merge_duplicates = False
     seed_cache_after = True
 
+    # CLI: `usa` or path to USA CSV enables merge on email (upsert existing leads)
     if len(sys.argv) > 1:
         arg = Path(sys.argv[1])
         if arg.name.lower() in {"usa", "--usa"}:

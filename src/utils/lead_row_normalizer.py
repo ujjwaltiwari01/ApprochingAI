@@ -1,10 +1,16 @@
-"""Normalize agency-list and USA owner CSV rows into a canonical lead shape."""
+"""Normalize agency-list and USA owner CSV rows into a canonical lead shape.
+
+Two upstream CSVs use different column names for the same concepts (company vs
+person leads). This module centralizes source detection and field mapping so
+importers, scorers, and the email LLM all speak one internal vocabulary.
+"""
 
 from __future__ import annotations
 
 LEAD_SOURCE_AGENCY_LIST = "agency_list"
 LEAD_SOURCE_USA_OWNERS = "usa_owners"
 
+# Generic inboxes are poor outreach targets — used to flag non-decision-makers.
 GENERIC_EMAIL_PREFIXES = (
     "info@",
     "hello@",
@@ -20,6 +26,7 @@ GENERIC_EMAIL_PREFIXES = (
 
 
 def detect_lead_source(row: dict) -> str:
+    # Heuristic: USA owner export has person-level fields the agency list lacks.
     if (row.get("email") or row.get("Email")) and (
         row.get("Company Name for Emails") or row.get("co_name") or row.get("Seniority")
     ):
@@ -28,6 +35,7 @@ def detect_lead_source(row: dict) -> str:
 
 
 def _first_nonempty(row: dict, *keys: str) -> str:
+    """Try keys in order — handles spelling/casing drift between CSV exports."""
     for key in keys:
         value = row.get(key)
         if value is None:
@@ -45,6 +53,7 @@ def scoring_fields_from_row(row: dict) -> dict:
         title = _first_nonempty(row, "Title")
         seniority = _first_nonempty(row, "Seniority")
         departments = _first_nonempty(row, "Departments")
+        # USA export maps "Keywords" → services; person metadata → expertise blob.
         return {
             "services": _first_nonempty(row, "Keywords"),
             "description": _first_nonempty(row, "SEO Description"),
@@ -80,6 +89,7 @@ def normalize_lead_fields(row: dict) -> dict:
         last = _first_nonempty(row, "Last Name")
         person_name = f"{first} {last}".strip() or None
         company_name = _first_nonempty(row, "Company Name for Emails", "co_name", "Company Name") or None
+        # email_key/website_key tell the importer which csv_raw columns to read later.
         return {
             "name": person_name,
             "email_key": "email",
@@ -90,6 +100,7 @@ def normalize_lead_fields(row: dict) -> dict:
             "scoring": scoring,
         }
 
+    # Agency list: "Name" is the company; contact is often a generic inbox.
     return {
         "name": _first_nonempty(row, "Name") or None,
         "email_key": "Email",
@@ -108,10 +119,12 @@ def is_direct_decision_maker_email(email: str) -> bool:
 
 def recipient_first_name_from_lead(lead) -> str | None:
     """Return first name for email greeting when the lead is a named USA contact."""
+    # Accept ORM objects or plain dicts — preview scripts and jobs pass both.
     source = getattr(lead, "lead_source", None)
     if source is None and isinstance(lead, dict):
         source = lead.get("lead_source")
 
+    # Only personalize when we have a real person; agency rows stay company-generic.
     if source != LEAD_SOURCE_USA_OWNERS:
         return None
 
@@ -126,12 +139,14 @@ def recipient_first_name_from_lead(lead) -> str | None:
         return None
 
     first = str(name).strip().split()[0]
+    # Reject initials/garbage so the LLM does not open with "Hi A,".
     if first and len(first) >= 2 and first[0].isalpha():
         return first
     return None
 
 
 def recipient_greeting_instruction(recipient_first_name: str | None) -> str:
+    # Prompt-level guardrails: explicit instructions beat hoping the model guesses.
     if recipient_first_name:
         return (
             f"Recipient first name: {recipient_first_name}. "

@@ -1,3 +1,21 @@
+"""CSV ingestion into Lead rows and optional WebsiteCache seeding.
+
+Role in pipeline: entry point for lead data — reads chunked CSVs, normalizes
+heterogeneous column names, scores each row, upserts by email, and can pre-populate
+``WebsiteCache`` from CSV text to skip Playwright on first touch.
+
+Why this design (interview angle): real lead files are messy (varying headers,
+duplicate emails across lists). Chunked pandas reads keep memory flat on 50k+
+rows. Email-level upsert with merge rules preserves outreach state (don't reset
+a lead already emailed) while letting better-scored re-imports win.
+
+Key decisions:
+- ``dtype=str`` + ``keep_default_na=False`` — avoids pandas mangling emails/phones.
+- Score at import time — prioritization works before any async scrape job runs.
+- ``seed_website_cache_from_csv`` — trades imperfect CSV copy for zero-latency analysis on cache hit.
+- Per-chunk DB session commit — balances transaction size vs failure blast radius.
+"""
+
 import pandas as pd
 from loguru import logger
 from sqlalchemy import func, select
@@ -27,6 +45,7 @@ def _row_to_lead(row: dict) -> dict | None:
         "match_score": match_score,
         "hiring_probability": hiring_prob,
         "lead_source": fields["lead_source"],
+        # Preserve full row for later CSV fallback when Playwright is skipped or fails.
         "csv_raw": {k: (v if pd.notna(v) else None) for k, v in row.items()},
     }
 
@@ -64,6 +83,7 @@ async def import_csv(csv_path, chunk_size: int = 1000) -> dict:
 
     stats = {"total": 0, "imported": 0, "updated": 0, "skipped": 0, "errors": 0}
 
+    # Chunked read: O(chunk_size) memory — required for multi-GB exports on CI runners.
     for chunk in pd.read_csv(csv_path, chunksize=chunk_size, dtype=str, keep_default_na=False):
         async with async_session() as session:
             for _, row in chunk.iterrows():
@@ -74,6 +94,7 @@ async def import_csv(csv_path, chunk_size: int = 1000) -> dict:
                     continue
 
                 try:
+                    # Case-insensitive email match — same person may appear with different casing across files.
                     result = await session.execute(
                         select(Lead).where(func.lower(Lead.email) == lead_data["email"])
                     )
@@ -105,6 +126,7 @@ def _cache_fields_from_row(row: dict) -> dict | None:
     description = scoring.get("description", "")
     services = scoring.get("services", "")
     team = scoring.get("team_bios", "")
+    # Need some descriptive text or seeding adds no value for personalization.
     if not description and not services:
         return None
 
@@ -148,6 +170,7 @@ async def seed_website_cache_from_csv(csv_path, chunk_size: int = 1000) -> int:
                     "summary": cache_fields["summary"],
                 }
 
+                # Mark CACHED so analyzer treats this like a successful scrape without hitting the site.
                 cache = WebsiteCache(
                     website=cache_fields["website"],
                     homepage_content=cache_fields["description"][:5000],

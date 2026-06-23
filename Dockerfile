@@ -1,3 +1,5 @@
+# API container — Python 3.11 slim keeps image smaller than full Playwright base.
+# Render sets $PORT; uvicorn binds 0.0.0.0 for health checks and GitHub Actions POSTs.
 FROM python:3.11-slim
 
 WORKDIR /app

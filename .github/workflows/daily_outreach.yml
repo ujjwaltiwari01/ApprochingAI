@@ -1,3 +1,13 @@
+# =============================================================================
+# Daily Outreach — external scheduler (replaces Render cron + long-running workers)
+#
+# INTERVIEW WHY GitHub Actions instead of in-process APScheduler/Celery:
+#   - Render free: no Redis, ~30s HTTP timeout, spins down when idle.
+#   - GHA can run 6 hours and call our API every 5 min with JOB_SECRET.
+#
+# Two crons: 7 PM IST primary, 1 AM IST backup if 6h timeout hit on primary.
+# concurrency.cancel-in-progress=false → queue overlapping runs, don't double-send.
+# =============================================================================
 name: Daily Outreach
 
 on:
@@ -49,7 +59,7 @@ jobs:
         run: |
           set -e
           base="${RENDER_URL%/}"
-          # 36 chunks × (~4 min process + 5 min wait) ≈ 5.4h — fits GitHub 6h limit
+          # 36 chunks × (~4 min work + 5 min sleep) ≈ 5.4h — under GitHub 6h job limit
           for i in $(seq 1 36); do
             echo "=== Chunk $i/36 ==="
             for attempt in 1 2 3; do

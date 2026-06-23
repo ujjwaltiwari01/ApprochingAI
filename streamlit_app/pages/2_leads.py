@@ -1,3 +1,8 @@
+"""Leads page — filterable table of prospects from Supabase.
+
+Filters: status, lead_source (usa_owners vs agency_list), match_score, limit.
+"""
+
 import sys
 from pathlib import Path
 
@@ -19,7 +24,7 @@ status_filter = st.selectbox(
 )
 source_filter = st.selectbox(
     "Lead source",
-    ["All", "usa_owners", "agency_list"],
+    ["All", "usa_owners", "agency_list"],  # Maps to leads.lead_source column
 )
 score_min = st.slider("Minimum match score", 0, 100, 0)
 limit = st.number_input("Max results", 10, 1000, 100)

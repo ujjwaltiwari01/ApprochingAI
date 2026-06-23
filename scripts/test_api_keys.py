@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Test all Brevo and LLM API keys from .env — never prints full keys."""
+"""Test all Brevo and LLM API keys from .env — never prints full keys.
+
+Pre-flight health check before enabling daily outreach or deploying to Render.
+Each provider gets a minimal "Reply with OK" call; LLMClient chain test mirrors
+production fallback order (mistral → cerebras → openrouter → gemini → groq).
+Exit code 1 if any check fails — suitable for CI or manual `python scripts/test_api_keys.py`.
+"""
 
 import asyncio
 import os
@@ -12,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-RESULTS: list[tuple[str, bool, str]] = []
+RESULTS: list[tuple[str, bool, str]] = []  # Collected for summary + exit code
 
 
 def record(name: str, ok: bool, detail: str = "") -> None:
@@ -54,6 +60,7 @@ def test_gemini() -> None:
         import google.generativeai as genai
 
         genai.configure(api_key=key)
+        # Try models in order — first success wins (matches production resilience)
         for model_name in ("gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"):
             try:
                 model = genai.GenerativeModel(model_name)
@@ -179,6 +186,7 @@ def test_mistral() -> None:
 
 
 async def test_llm_client_chain() -> None:
+    """End-to-end test of the same LLMClient used by EmailGenerator."""
     try:
         from src.core.config import get_settings
         from src.services.llm_client import LLMClient
@@ -206,8 +214,8 @@ def main() -> None:
     print("API KEY TEST SUITE")
     print("=" * 60)
 
-    test_supabase()
-    for i in range(1, 4):
+    test_supabase()  # DB reachability first — downstream tests assume data layer works
+    for i in range(1, 4):  # Three Brevo sender accounts (150/day each)
         test_brevo(i)
     test_gemini()
     test_groq()
