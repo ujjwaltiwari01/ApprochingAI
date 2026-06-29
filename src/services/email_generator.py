@@ -298,8 +298,26 @@ class EmailGenerator:
         body = self._normalize_body(body)
         return subject, body
 
+    def _strip_dashes(self, text: str) -> str:
+        """Replace banned dashes with commas — LLMs emit em-dashes no matter the prompt.
+
+        Validation hard-bans "—" and " - "; rather than retry forever, we normalize
+        them deterministically (em/en/horizontal-bar dashes and spaced hyphens →
+        comma). Range hyphens like "18-25%" have no surrounding spaces and are kept.
+        """
+        for dash in ("—", "–", "―", "‐", "‑", "‒"):
+            text = text.replace(f" {dash} ", ", ")
+            text = text.replace(dash, ", ")
+        text = text.replace(" - ", ", ")
+        text = text.replace(" ,", ",")
+        # Collapse any doubled spaces / commas the substitutions may have created.
+        text = re.sub(r" {2,}", " ", text)
+        text = re.sub(r",\s*,", ",", text)
+        return text
+
     def _normalize_body(self, body: str) -> str:
         """Strip stray Subject lines and enforce Ujjwal before link lines."""
+        body = self._strip_dashes(body)
         lines = [ln for ln in body.split("\n") if not ln.strip().lower().startswith("subject:")]
         content: list[str] = []
         links: list[str] = []
