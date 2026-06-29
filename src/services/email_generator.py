@@ -180,6 +180,38 @@ class EmailGenerator:
         text, provider = await self.llm.generate(prompt, max_tokens=400, task="followup")
         subject, body = self._parse_email_output(text)
         valid = self._validate_email(subject, body, agency_analysis, is_followup=True)
+
+        attempts = 0
+        max_retries = self.settings.llm_email_max_retries
+        # Same validation-driven retry as initial emails — follow-ups were silently
+        # skipped before because a single validation miss had no second chance.
+        while not valid and attempts < max_retries:
+            attempts += 1
+            details = self.validate_email_details(subject, body, agency_analysis, is_followup=True)
+            logger.warning(
+                f"Follow-up validation failed for {company_name}, regenerating (attempt {attempts}): "
+                f"{', '.join(details['reasons'])}"
+            )
+            retry_text, provider = await self.llm.generate(
+                prompt
+                + f"\n\nIMPORTANT: Previous attempt failed validation.\n"
+                f"Issues: {', '.join(details['reasons'])}.\n"
+                f"Current body word count: {details['word_count']} (need 40 to 110).\n"
+                "Rewrite completely. Keep it short. No dashes. No buzzwords. "
+                "End the body with this exact sign-off block, each on its own line:\n"
+                f"Ujjwal\nPortfolio: {self.settings.sender_portfolio_url}\n"
+                f"LinkedIn: {self.settings.sender_linkedin_url}",
+                system=(
+                    "You are Ujjwal Tiwari writing a concise follow-up email. "
+                    "The body MUST be 40 to 110 words and MUST end with the exact "
+                    "sign-off block: 'Ujjwal', then the Portfolio line, then the LinkedIn line."
+                ),
+                max_tokens=400,
+                task="followup_retry",
+            )
+            subject, body = self._parse_email_output(retry_text)
+            valid = self._validate_email(subject, body, agency_analysis, is_followup=True)
+
         return subject, body, provider, valid
 
     async def generate_subject_lines(self, company_name: str, agency_analysis: dict) -> list[str]:

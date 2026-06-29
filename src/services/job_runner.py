@@ -88,9 +88,19 @@ class JobRunner:
                     batch_stats = await self.processor.process_followups(followup_leads)
                     for key, val in batch_stats.items():
                         followup_stats[key] = followup_stats.get(key, 0) + val
-                    fu_sent_today += batch_stats.get("sent", 0)
+                    sent_now = batch_stats.get("sent", 0)
+                    fu_sent_today += sent_now
                     checkpoint["followups_sent_count"] = fu_sent_today
-                    chunk_budget -= len(followup_leads)
+                    if sent_now > 0:
+                        chunk_budget -= len(followup_leads)
+                    else:
+                        # A full batch of eligible follow-ups sent nothing (e.g. all
+                        # failed validation). Stop retrying them for the rest of today
+                        # so they can't monopolize every chunk and starve new leads.
+                        checkpoint["followups_done"] = True
+                else:
+                    # No eligible follow-ups left — let new leads use the budget.
+                    checkpoint["followups_done"] = True
 
                 if fu_sent_today >= daily_fu_cap:
                     checkpoint["followups_done"] = True
